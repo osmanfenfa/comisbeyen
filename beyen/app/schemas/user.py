@@ -98,6 +98,7 @@ class ResetPasswordRequest(BaseModel):
 
 class GoogleAuthRequest(BaseModel):
     credential: str | None = None
+    access_token: str | None = None
     email: str | None = None
     name: str | None = None
     google_id: str | None = None

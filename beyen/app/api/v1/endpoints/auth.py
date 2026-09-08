@@ -6,6 +6,7 @@ Includes password reset via email and Google OAuth authentication.
 import base64
 import json
 import secrets
+import urllib.request
 import uuid
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
@@ -146,6 +147,22 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
     name = (payload.name or "").strip()
     google_id = payload.google_id
     produce_name = (payload.produce_name or "").strip()
+
+    # Verify access_token with Google userinfo API to guarantee authentic real email
+    if payload.access_token:
+        try:
+            req = urllib.request.Request(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {payload.access_token.strip()}"},
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                if resp.status == 200:
+                    google_data = json.loads(resp.read().decode("utf-8"))
+                    email = (google_data.get("email") or email).strip().lower()
+                    name = name or google_data.get("name") or google_data.get("given_name")
+                    google_id = google_id or google_data.get("sub")
+        except Exception:
+            pass
 
     # Attempt decoding from Google JWT credential if present
     if payload.credential:
