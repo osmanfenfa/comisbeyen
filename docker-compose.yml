@@ -1,0 +1,42 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: comis_user
+      POSTGRES_PASSWORD: comis_pass
+      POSTGRES_DB: comis_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - comis_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U comis_user -d comis_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./beyen
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - ./beyen/.env
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://comis_user:comis_pass@db:5432/comis_db
+
+  frontend:
+    build: ./frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  comis_pgdata:

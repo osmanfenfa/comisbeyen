@@ -1,0 +1,19 @@
+{
+  "short_name": "COMIS",
+  "name": "COMIS — Cocoa, Coffee & Cola Management",
+  "description": "Mobile Buying Station Produce, Loan & Receipt Management System",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#1b4332",
+  "theme_color": "#1b4332",
+  "display": "standalone",
+  "orientation": "portrait"
+}
+

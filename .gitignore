@@ -1,0 +1,15 @@
+# Backend ignores
+beyen/comis/
+beyen/venv/
+beyen/.env
+beyen/*.db
+beyen/*.sqlite3
+beyen/test_comis.db
+beyen/.pytest_cache/
+beyen/__pycache__/
+
+# Frontend ignores
+comisbefoe/node_modules/
+comisbefoe/dist/
+comisbefoe/.env
+comisbefoe/.env.local
