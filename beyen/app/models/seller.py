@@ -26,6 +26,7 @@ class Seller(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_random: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=True)
+    produce_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True, index=True)
 
     cocoa_transactions = relationship("CocoaTransaction", back_populates="seller")
     coffee_transactions = relationship("CoffeeTransaction", back_populates="seller")

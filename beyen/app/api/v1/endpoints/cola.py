@@ -43,6 +43,8 @@ def record_cola_purchase(
     db: Session = Depends(get_db),
     current=Depends(ANY_STAFF),
 ):
+    tenant_produce_id = current.get("produce_id") or current["id"]
+
     seller_id = payload.seller_id
     if not seller_id:
         if payload.random_seller_name:
@@ -56,6 +58,7 @@ def record_cola_purchase(
                 address="Walk-in / Random",
                 gender=GenderEnum.other,
                 is_random=True,
+                produce_id=tenant_produce_id,
                 created_by=current["id"],
             )
             db.add(rnd_seller)
@@ -73,6 +76,8 @@ def record_cola_purchase(
         price_per_kg=payload.price_per_kg,
         total_price=total_price,
         status=TransactionStatus.pending,
+        produce_id=tenant_produce_id,
+        station_name=current.get("station_name"),
         created_by=current["id"],
     )
     db.add(txn)
@@ -93,6 +98,11 @@ def edit_purchase(
     txn = db.query(ColaTransaction).filter(ColaTransaction.id == txn_id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
+
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if txn.produce_id and txn.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
     is_secretary = current["role"] == UserRole.produce_secretary.value
     if is_secretary and txn.created_by != current["id"]:
@@ -138,6 +148,10 @@ def approve_purchase(
     txn = db.query(ColaTransaction).filter(ColaTransaction.id == txn_id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if txn.produce_id and txn.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
     if txn.status != TransactionStatus.pending:
         raise HTTPException(status_code=400, detail="Only PENDING transactions can be approved.")
 
@@ -160,6 +174,10 @@ def reject_purchase(
     txn = db.query(ColaTransaction).filter(ColaTransaction.id == txn_id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if txn.produce_id and txn.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
     if txn.status not in (TransactionStatus.pending, TransactionStatus.approved):
         raise HTTPException(status_code=400, detail="Only PENDING or APPROVED transactions can be rejected.")
 
@@ -183,6 +201,10 @@ def issue_receipt(
     txn = db.query(ColaTransaction).filter(ColaTransaction.id == txn_id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if txn.produce_id and txn.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
     if txn.status != TransactionStatus.approved:
         raise HTTPException(status_code=400,
                             detail="Transaction must be APPROVED before a receipt can be issued.")
@@ -212,12 +234,29 @@ def issue_receipt(
 def list_cola_purchases(
     status: TransactionStatus | None = None,
     seller_id: uuid.UUID | None = None,
+    station: str | None = None,
     db: Session = Depends(get_db),
     current=Depends(ANY_STAFF),
 ):
     query = db.query(ColaTransaction)
-    if current["role"] == UserRole.produce_secretary.value:
-        query = query.filter(ColaTransaction.created_by == current["id"])
+
+    # Tenant isolation
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        query = query.filter(ColaTransaction.produce_id == tenant_produce_id)
+
+        # Secretary sees their station or own submissions
+        if current["role"] == UserRole.produce_secretary.value:
+            if current.get("station_name"):
+                query = query.filter(
+                    (ColaTransaction.station_name == current["station_name"]) |
+                    (ColaTransaction.created_by == current["id"])
+                )
+            else:
+                query = query.filter(ColaTransaction.created_by == current["id"])
+
+    if station:
+        query = query.filter(ColaTransaction.station_name == station)
     if status:
         query = query.filter(ColaTransaction.status == status)
     if seller_id:
@@ -230,6 +269,11 @@ def get_cola_purchase(txn_id: uuid.UUID, db: Session = Depends(get_db), current=
     txn = db.query(ColaTransaction).filter(ColaTransaction.id == txn_id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
-    if current["role"] == UserRole.produce_secretary.value and txn.created_by != current["id"]:
-        raise HTTPException(status_code=403, detail="Access denied")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if txn.produce_id and txn.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+    if current["role"] == UserRole.produce_secretary.value:
+        if current.get("station_name") and txn.station_name != current["station_name"] and txn.created_by != current["id"]:
+            raise HTTPException(status_code=403, detail="Access denied")
     return txn

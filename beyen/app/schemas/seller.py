@@ -36,6 +36,7 @@ class SellerOut(SellerBase):
     is_active: bool
     is_random: bool = False
     created_by: uuid.UUID | None
+    produce_id: uuid.UUID | None = None
 
     class Config:
         from_attributes = True

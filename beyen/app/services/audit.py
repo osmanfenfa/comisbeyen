@@ -7,10 +7,18 @@ from app.models.audit_log import AuditLog
 
 def log_action(db: Session, user_id: uuid.UUID, user_role: str, action: str,
                 entity_type: str, entity_id: uuid.UUID | None = None,
-                old_value: dict | None = None, new_value: dict | None = None):
+                old_value: dict | None = None, new_value: dict | None = None,
+                produce_id: uuid.UUID | None = None):
+    if not produce_id and user_id:
+        from app.models.user import User
+        u = db.query(User.produce_id).filter(User.id == user_id).first()
+        if u and u[0]:
+            produce_id = u[0]
+
     entry = AuditLog(
         user_id=user_id,
         user_role=user_role,
+        produce_id=produce_id,
         action=action,
         entity_type=entity_type,
         entity_id=entity_id,

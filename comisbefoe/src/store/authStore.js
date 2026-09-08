@@ -13,8 +13,9 @@ function loadInitialState() {
         role: data.role || null,
         name: data.name || "",
         userId: data.userId || null,
+        produceId: data.produceId || null,
         produceName: produce,
-        stationName: produce,
+        stationName: data.stationName || produce,
       };
     }
   } catch (e) {
@@ -25,23 +26,27 @@ function loadInitialState() {
     role: null,
     name: "",
     userId: null,
-    produceName: "Kenema Produce",
-    stationName: "Kenema Station",
+    produceId: null,
+    produceName: "Confidence Produce",
+    stationName: "Main Station",
   };
 }
 
 export const useAuthStore = create((set) => ({
   ...loadInitialState(),
 
-  login: ({ token, role, name, userId, stationName, businessName, produceName }) => {
-    const resolvedProduce = produceName || businessName || stationName || "COMIS Produce";
+  login: ({ token, role, name, userId, stationName, businessName, produceName, produceId, produce_id }) => {
+    const resolvedProduce = produceName || businessName || "COMIS Produce";
+    const resolvedStation = stationName || resolvedProduce;
+    const resolvedProduceId = produceId || produce_id || null;
     const session = {
       token,
       role,
       name: name || "Staff",
       userId,
+      produceId: resolvedProduceId,
       produceName: resolvedProduce,
-      stationName: resolvedProduce,
+      stationName: resolvedStation,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
@@ -79,6 +84,7 @@ export const useAuthStore = create((set) => ({
       role: null,
       name: "",
       userId: null,
+      produceId: null,
       produceName: "",
       stationName: "",
     });

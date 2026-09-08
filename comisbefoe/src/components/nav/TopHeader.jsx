@@ -23,8 +23,14 @@ export default function TopHeader() {
   const isManager = role === "produce_manager";
   const isSecretary = role === "produce_secretary";
 
-  const displayName = produceName || stationName || "Confidence Produce Farmers Corporation";
-  const displayRole = isSystemAdmin ? "Admin" : isManager ? "Manager" : "Secretary";
+  const displayName = produceName || "Confidence Produce";
+  const displayRole = isSystemAdmin
+    ? "Admin"
+    : isManager
+    ? "Manager"
+    : isSecretary && stationName && stationName !== produceName
+    ? `Secretary • ${stationName}`
+    : "Secretary";
 
   return (
     <header className="bg-white text-slate-800 sticky top-0 z-40 border-b border-slate-100 shadow-2xs">

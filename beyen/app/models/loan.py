@@ -17,6 +17,7 @@ class Loan(Base):
     notes: Mapped[str] = mapped_column(String(255), nullable=True)
 
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))       # Manager/Admin only
+    produce_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True, index=True)
     approved_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

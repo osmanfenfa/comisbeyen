@@ -23,12 +23,22 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def create_access_token(user_id: uuid.UUID, role: str, name: str = "") -> str:
+def create_access_token(
+    user_id: uuid.UUID,
+    role: str,
+    name: str = "",
+    produce_id: uuid.UUID | None = None,
+    station_name: str | None = None,
+    business_name: str | None = None,
+) -> str:
     expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": str(user_id),
         "role": role,
         "name": name,
+        "produce_id": str(produce_id) if produce_id else None,
+        "station_name": station_name,
+        "business_name": business_name,
         "exp": expire,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)

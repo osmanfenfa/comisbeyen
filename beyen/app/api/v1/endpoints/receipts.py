@@ -33,6 +33,10 @@ def list_receipts(
     """
     from datetime import datetime
     query = db.query(Receipt)
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        query = query.filter(Receipt.produce_id == tenant_produce_id)
+
     if seller_id:
         query = query.filter(Receipt.seller_id == seller_id)
     if transaction_type:
@@ -49,7 +53,7 @@ def list_receipts(
             query = query.filter(Receipt.issued_at <= dt)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date_to format. Use ISO 8601.")
-    return query.order_by(Receipt.issued_at.desc()).all()
+
     receipts = query.order_by(Receipt.issued_at.desc()).all()
     from app.services.receipt_helper import format_receipt_out
     return [format_receipt_out(r, db) for r in receipts]
@@ -64,6 +68,9 @@ def get_receipt(
     receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
     if not receipt:
         raise HTTPException(status_code=404, detail="Receipt not found")
-    return receipt
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if receipt.produce_id and receipt.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
     from app.services.receipt_helper import format_receipt_out
     return format_receipt_out(receipt, db)

@@ -38,6 +38,10 @@ def list_audit_logs(
     from datetime import datetime
     query = db.query(AuditLog)
 
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        query = query.filter(AuditLog.produce_id == tenant_produce_id)
+
     if user_id:
         query = query.filter(AuditLog.user_id == user_id)
     if entity_type:

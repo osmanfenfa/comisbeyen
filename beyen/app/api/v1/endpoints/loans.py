@@ -46,7 +46,13 @@ def create_loan(
     current=Depends(MANAGER_OR_ADMIN),
 ):
     """Create and auto-approve a loan (Manager is the authority). (spec section 10)"""
-    loan = Loan(**payload.model_dump(), created_by=current["id"], approved_by=current["id"])
+    tenant_produce_id = current.get("produce_id") or current["id"]
+    loan = Loan(
+        **payload.model_dump(),
+        created_by=current["id"],
+        approved_by=current["id"],
+        produce_id=tenant_produce_id,
+    )
     db.add(loan)
     db.commit()
     db.refresh(loan)
@@ -61,19 +67,26 @@ def record_repayment(
     db: Session = Depends(get_db),
     current=Depends(MANAGER_OR_ADMIN),
 ):
-    """Record a loan repayment and update loan status. (spec section 10)"""
+    """Record a cash loan repayment. (spec section 10)"""
     loan = db.query(Loan).filter(Loan.id == payload.loan_id).first()
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if loan.produce_id and loan.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
-    repayment = LoanRepayment(**payload.model_dump(), recorded_by=current["id"])
+    repayment = LoanRepayment(
+        loan_id=payload.loan_id,
+        amount_paid=payload.amount_paid,
+        date=payload.date,
+        recorded_by=current["id"],
+    )
     db.add(repayment)
-    db.commit()
-    db.refresh(loan)
+    db.flush()
 
     total_paid = sum(r.amount_paid for r in loan.repayments)
     balance = calculate_loan_balance(loan.loan_taken, total_paid)
-
     if balance <= 0:
         loan.status = "cleared"
     else:
@@ -93,6 +106,9 @@ def list_loans(
     current=Depends(MANAGER_OR_ADMIN),
 ):
     query = db.query(Loan)
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        query = query.filter(Loan.produce_id == tenant_produce_id)
     if seller_id:
         query = query.filter(Loan.seller_id == seller_id)
     if status:
@@ -116,6 +132,10 @@ def get_loan(
     loan = db.query(Loan).filter(Loan.id == loan_id).first()
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if loan.produce_id and loan.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
     _update_overdue(loan)
     db.commit()
     enriched = _enrich_loan(loan)

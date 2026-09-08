@@ -78,6 +78,8 @@ def record_cocoa_purchase(
     standard_percent = _get_standard_percent(db)
     result = _compute(payload, standard_percent)
 
+    tenant_produce_id = current.get("produce_id") or current["id"]
+
     seller_id = payload.seller_id
     if not seller_id:
         if payload.random_seller_name:
@@ -91,6 +93,7 @@ def record_cocoa_purchase(
                 address="Walk-in / Random",
                 gender=GenderEnum.other,
                 is_random=True,
+                produce_id=tenant_produce_id,
                 created_by=current["id"],
             )
             db.add(rnd_seller)
@@ -108,6 +111,8 @@ def record_cocoa_purchase(
         net_weight_kg=result["net_weight_kg"],
         total_price=result["total_price"],
         status=TransactionStatus.pending,
+        produce_id=tenant_produce_id,
+        station_name=current.get("station_name"),
         created_by=current["id"],
     )
     db.add(txn)
@@ -138,6 +143,11 @@ def edit_purchase(
     txn = db.query(CocoaTransaction).filter(CocoaTransaction.id == txn_id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
+
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if txn.produce_id and txn.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
     is_secretary = current["role"] == UserRole.produce_secretary.value
 
@@ -211,6 +221,10 @@ def approve_purchase(
     txn = db.query(CocoaTransaction).filter(CocoaTransaction.id == txn_id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if txn.produce_id and txn.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
     if txn.status != TransactionStatus.pending:
         raise HTTPException(status_code=400, detail="Only PENDING transactions can be approved.")
 
@@ -237,6 +251,10 @@ def reject_purchase(
     txn = db.query(CocoaTransaction).filter(CocoaTransaction.id == txn_id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if txn.produce_id and txn.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
     if txn.status not in (TransactionStatus.pending, TransactionStatus.approved):
         raise HTTPException(status_code=400, detail="Only PENDING or APPROVED transactions can be rejected.")
 
@@ -269,6 +287,10 @@ def issue_receipt(
     txn = db.query(CocoaTransaction).filter(CocoaTransaction.id == txn_id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if txn.produce_id and txn.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
     if txn.status != TransactionStatus.approved:
         raise HTTPException(
             status_code=400,
@@ -307,13 +329,29 @@ def issue_receipt(
 def list_cocoa_purchases(
     status: TransactionStatus | None = None,
     seller_id: uuid.UUID | None = None,
+    station: str | None = None,
     db: Session = Depends(get_db),
     current=Depends(ANY_STAFF),
 ):
     query = db.query(CocoaTransaction)
-    # Secretary sees only their own submissions (spec section 2.3)
-    if current["role"] == UserRole.produce_secretary.value:
-        query = query.filter(CocoaTransaction.created_by == current["id"])
+
+    # Tenant isolation: Only Admin can see across different Produce accounts
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        query = query.filter(CocoaTransaction.produce_id == tenant_produce_id)
+
+        # Secretary sees their assigned station or their own submissions
+        if current["role"] == UserRole.produce_secretary.value:
+            if current.get("station_name"):
+                query = query.filter(
+                    (CocoaTransaction.station_name == current["station_name"]) |
+                    (CocoaTransaction.created_by == current["id"])
+                )
+            else:
+                query = query.filter(CocoaTransaction.created_by == current["id"])
+
+    if station:
+        query = query.filter(CocoaTransaction.station_name == station)
     if status:
         query = query.filter(CocoaTransaction.status == status)
     if seller_id:
@@ -326,6 +364,11 @@ def get_cocoa_purchase(txn_id: uuid.UUID, db: Session = Depends(get_db), current
     txn = db.query(CocoaTransaction).filter(CocoaTransaction.id == txn_id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
-    if current["role"] == UserRole.produce_secretary.value and txn.created_by != current["id"]:
-        raise HTTPException(status_code=403, detail="Access denied")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if txn.produce_id and txn.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+    if current["role"] == UserRole.produce_secretary.value:
+        if current.get("station_name") and txn.station_name != current["station_name"] and txn.created_by != current["id"]:
+            raise HTTPException(status_code=403, detail="Access denied")
     return txn

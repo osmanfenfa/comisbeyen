@@ -23,6 +23,8 @@ class CocoaTransaction(Base):
     status: Mapped[TransactionStatus] = mapped_column(Enum(TransactionStatus), default=TransactionStatus.pending)
     rejection_reason: Mapped[str] = mapped_column(String(255), nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    produce_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True, index=True)
+    station_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     reviewed_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=True)
     approved_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

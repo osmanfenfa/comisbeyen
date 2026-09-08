@@ -22,6 +22,7 @@ class Receipt(Base):
     # Who did what (spec section 11: recorded_by = Secretary, issued_by = Manager)
     recorded_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=True)
     issued_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    produce_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True, index=True)
     issued_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Produce Account / Station Snapshot

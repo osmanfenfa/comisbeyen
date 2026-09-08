@@ -44,6 +44,8 @@ class ColaTransactionOut(BaseModel):
     seller_contact: str | None = None
     seller_code: str | None = None
     is_random_seller: bool = False
+    produce_id: uuid.UUID | None = None
+    station_name: str | None = None
 
     class Config:
         from_attributes = True

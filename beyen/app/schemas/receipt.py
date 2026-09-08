@@ -24,6 +24,7 @@ class ReceiptOut(BaseModel):
     is_admin_override: bool
 
     # Produce Account / Station Details
+    produce_id: uuid.UUID | None = None
     station_name: str | None = None
     business_name: str | None = None
     business_address: str | None = None

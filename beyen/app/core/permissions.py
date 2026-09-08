@@ -19,10 +19,15 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         payload = decode_access_token(token)
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    produce_id_str = payload.get("produce_id")
     return {
         "id": uuid.UUID(payload["sub"]),
         "role": payload["role"],
         "name": payload.get("name", ""),
+        "produce_id": uuid.UUID(produce_id_str) if produce_id_str else None,
+        "station_name": payload.get("station_name"),
+        "business_name": payload.get("business_name"),
     }
 
 

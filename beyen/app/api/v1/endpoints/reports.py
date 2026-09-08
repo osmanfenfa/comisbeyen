@@ -35,8 +35,17 @@ MANAGER_OR_ADMIN = require_role(UserRole.produce_manager, UserRole.system_admin)
 def _filter_produce(model, db, current, status=None, seller_id=None,
                     date_from=None, date_to=None):
     query = db.query(model)
-    if current["role"] == UserRole.produce_secretary.value:
-        query = query.filter(model.created_by == current["id"])
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        query = query.filter(model.produce_id == tenant_produce_id)
+        if current["role"] == UserRole.produce_secretary.value:
+            if current.get("station_name"):
+                query = query.filter(
+                    (model.station_name == current["station_name"]) |
+                    (model.created_by == current["id"])
+                )
+            else:
+                query = query.filter(model.created_by == current["id"])
     if seller_id:
         query = query.filter(model.seller_id == seller_id)
     if status:
@@ -156,6 +165,9 @@ def loans_report(
 ):
     """Loan status report."""
     query = db.query(Loan)
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        query = query.filter(Loan.produce_id == tenant_produce_id)
     if seller_id:
         query = query.filter(Loan.seller_id == seller_id)
     if status:
@@ -205,7 +217,14 @@ def seller_statement(
     cola = _filter_produce(ColaTransaction, db, current, seller_id=seller_id,
                            date_from=date_from, date_to=date_to)
 
-    loans = db.query(Loan).filter(Loan.seller_id == seller_id).all()
+    loan_query = db.query(Loan).filter(Loan.seller_id == seller_id)
+    receipt_query = db.query(Receipt).filter(Receipt.seller_id == seller_id)
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        loan_query = loan_query.filter(Loan.produce_id == tenant_produce_id)
+        receipt_query = receipt_query.filter(Receipt.produce_id == tenant_produce_id)
+
+    loans = loan_query.all()
     loan_rows = []
     for loan in loans:
         total_paid = sum(r.amount_paid for r in loan.repayments)
@@ -216,7 +235,7 @@ def seller_statement(
             "balance": balance, "status": loan.status,
         })
 
-    receipts = db.query(Receipt).filter(Receipt.seller_id == seller_id).all()
+    receipts = receipt_query.all()
 
     return {
         "seller_id": str(seller_id),

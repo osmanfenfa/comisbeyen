@@ -11,6 +11,7 @@ class AuditLog(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    produce_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True, index=True)
     user_role: Mapped[str] = mapped_column(String(30))
     action: Mapped[str] = mapped_column(String(50))          # e.g. "approve", "reject", "issue_receipt", "edit"
     entity_type: Mapped[str] = mapped_column(String(50))     # e.g. "CocoaTransaction", "Loan"
