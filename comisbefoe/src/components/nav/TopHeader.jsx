@@ -3,12 +3,14 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore.js";
 import { 
   LogOut, Settings, Users, FileBarChart, 
-  Receipt, ShieldCheck, User as UserIcon
+  Receipt, ShieldCheck, User as UserIcon, KeyRound
 } from "lucide-react";
+import ChangePasswordModal from "../shared/ChangePasswordModal.jsx";
 
 export default function TopHeader() {
   const { role, name, stationName, produceName, logout } = useAuthStore();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -263,8 +265,41 @@ export default function TopHeader() {
                   )}
                 </div>
 
+                {/* Quick Navigation / Settings in Profile Popover */}
+                <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-1">
+                  <Link
+                    to="/receipts"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-[#168821] transition"
+                  >
+                    <Receipt className="w-4 h-4 text-emerald-700" />
+                    <span>Receipts & Verification</span>
+                  </Link>
+
+                  <Link
+                    to="/reports"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-[#168821] transition"
+                  >
+                    <FileBarChart className="w-4 h-4 text-emerald-700" />
+                    <span>Reports & Analytics</span>
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setChangePasswordOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 transition cursor-pointer text-left"
+                  >
+                    <KeyRound className="w-4 h-4 text-amber-600" />
+                    <span>Change Password</span>
+                  </button>
+                </div>
+
                 {/* Bottom Logout Row */}
-                <div className="mt-4 pt-3 border-t border-slate-100">
+                <div className="mt-2 pt-2.5 border-t border-slate-100">
                   <button
                     onClick={handleLogout}
                     className="flex items-center gap-1.5 text-[#d32f2f] hover:text-red-700 font-bold text-sm transition cursor-pointer"
@@ -279,6 +314,48 @@ export default function TopHeader() {
         </div>
 
       </div>
+
+      {/* Mobile Quick Action Bar: Receipt, Report, and Change Password */}
+      <div className="md:hidden flex items-center justify-between gap-1.5 px-3 py-1.5 bg-slate-50/95 border-t border-slate-200/70">
+        <Link
+          to="/receipts"
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-bold transition ${
+            location.pathname === "/receipts"
+              ? "bg-[#168821] text-white shadow-xs"
+              : "bg-white text-slate-700 border border-slate-200 hover:bg-emerald-50 hover:text-[#168821]"
+          }`}
+        >
+          <Receipt className="w-3.5 h-3.5 shrink-0" />
+          <span>Receipt</span>
+        </Link>
+
+        <Link
+          to="/reports"
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-bold transition ${
+            location.pathname === "/reports"
+              ? "bg-[#168821] text-white shadow-xs"
+              : "bg-white text-slate-700 border border-slate-200 hover:bg-emerald-50 hover:text-[#168821]"
+          }`}
+        >
+          <FileBarChart className="w-3.5 h-3.5 shrink-0" />
+          <span>Report</span>
+        </Link>
+
+        <button
+          type="button"
+          onClick={() => setChangePasswordOpen(true)}
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-bold transition bg-white text-amber-800 border border-amber-300 hover:bg-amber-50 cursor-pointer"
+        >
+          <KeyRound className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+          <span>Password</span>
+        </button>
+      </div>
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
+      />
     </header>
   );
 }

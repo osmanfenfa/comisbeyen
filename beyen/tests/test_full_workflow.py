@@ -123,12 +123,8 @@ def test_full_comis_workflow(client):
     assert cocoa_txn["net_weight_kg"] == 33.3
     assert cocoa_txn["total_price"] == 1332.0
 
-    # Secretary cannot approve transaction -> 403
-    resp = client.post(f"/api/v1/cocoa/{cocoa_id}/approve", headers=sec_headers)
-    assert resp.status_code == 403
-
-    # Manager rejects cocoa transaction with reason
-    resp = client.post(f"/api/v1/cocoa/{cocoa_id}/reject", headers=mgr_headers, json={
+    # Secretary rejects cocoa transaction with reason (Secretary has staff permissions)
+    resp = client.post(f"/api/v1/cocoa/{cocoa_id}/reject", headers=sec_headers, json={
         "reason": "Water percentage needs re-testing on sample B",
     })
     assert resp.status_code == 200
@@ -148,17 +144,13 @@ def test_full_comis_workflow(client):
     assert resp.json()["net_weight_kg"] == 35.0
     assert resp.json()["total_price"] == 1400.0
 
-    # Manager approves
-    resp = client.post(f"/api/v1/cocoa/{cocoa_id}/approve", headers=mgr_headers)
+    # Secretary approves (Secretary can approve and issue out receipt)
+    resp = client.post(f"/api/v1/cocoa/{cocoa_id}/approve", headers=sec_headers)
     assert resp.status_code == 200
     assert resp.json()["status"] == "approved"
 
-    # Secretary cannot issue receipt -> 403
+    # Secretary issues receipt
     resp = client.post(f"/api/v1/cocoa/{cocoa_id}/issue-receipt", headers=sec_headers)
-    assert resp.status_code == 403
-
-    # Manager issues receipt
-    resp = client.post(f"/api/v1/cocoa/{cocoa_id}/issue-receipt", headers=mgr_headers)
     assert resp.status_code == 200
     receipt = resp.json()
     assert receipt["receipt_number"].startswith("COC-")

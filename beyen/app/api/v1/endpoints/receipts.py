@@ -15,7 +15,7 @@ from app.schemas.receipt import ReceiptOut
 
 router = APIRouter()
 
-MANAGER_OR_ADMIN = require_role(UserRole.produce_manager, UserRole.system_admin)
+STAFF_ROLES = require_role(UserRole.produce_manager, UserRole.produce_secretary, UserRole.system_admin)
 
 
 @router.get("/", response_model=list[ReceiptOut])
@@ -25,7 +25,7 @@ def list_receipts(
     date_from: str | None = None,
     date_to: str | None = None,
     db: Session = Depends(get_db),
-    current=Depends(MANAGER_OR_ADMIN),
+    current=Depends(STAFF_ROLES),
 ):
     """
     Manager/Admin — list issued receipts.
@@ -63,7 +63,7 @@ def list_receipts(
 def get_receipt(
     receipt_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current=Depends(MANAGER_OR_ADMIN),
+    current=Depends(STAFF_ROLES),
 ):
     receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
     if not receipt:

@@ -163,7 +163,7 @@ def edit_purchase(
 def approve_purchase(
     txn_id: uuid.UUID,
     db: Session = Depends(get_db),
-    current=Depends(MANAGER_OR_ADMIN),
+    current=Depends(ANY_STAFF),
 ):
     txn = db.query(CoffeeTransaction).filter(CoffeeTransaction.id == txn_id).first()
     if not txn:
@@ -189,7 +189,7 @@ def reject_purchase(
     txn_id: uuid.UUID,
     payload: RejectPayload,
     db: Session = Depends(get_db),
-    current=Depends(MANAGER_OR_ADMIN),
+    current=Depends(ANY_STAFF),
 ):
     txn = db.query(CoffeeTransaction).filter(CoffeeTransaction.id == txn_id).first()
     if not txn:
@@ -216,7 +216,7 @@ def issue_receipt(
     txn_id: uuid.UUID,
     loan_deduction: float = 0.0,
     db: Session = Depends(get_db),
-    current=Depends(MANAGER_OR_ADMIN),
+    current=Depends(ANY_STAFF),
 ):
     txn = db.query(CoffeeTransaction).filter(CoffeeTransaction.id == txn_id).first()
     if not txn:

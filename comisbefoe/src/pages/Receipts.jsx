@@ -35,9 +35,7 @@ export default function Receipts() {
   useEffect(() => {
     fetchSellers();
     loadReceipts();
-    if (role === "produce_manager" || role === "system_admin") {
-      loadPending();
-    }
+    loadPending();
   }, []);
 
   const loadReceipts = async () => {
@@ -55,17 +53,25 @@ export default function Receipts() {
   const loadPending = async () => {
     setLoadingPending(true);
     try {
-      const [cRes, cofRes, colRes] = await Promise.all([
+      const [cPending, cApproved, cofPending, cofApproved, colPending, colApproved] = await Promise.all([
         client.get("/cocoa/?status=pending"),
+        client.get("/cocoa/?status=approved"),
         client.get("/coffee/?status=pending"),
+        client.get("/coffee/?status=approved"),
         client.get("/cola/?status=pending"),
+        client.get("/cola/?status=approved"),
       ]);
-      const cocoa = (cRes.data || []).map((t) => ({ ...t, commodity: "cocoa" }));
-      const coffee = (cofRes.data || []).map((t) => ({ ...t, commodity: "coffee" }));
-      const cola = (colRes.data || []).map((t) => ({ ...t, commodity: "cola" }));
-      setPendingTxns([...cocoa, ...coffee, ...cola]);
+      const cocoa = [...(cPending.data || []), ...(cApproved.data || [])].map((t) => ({ ...t, commodity: "cocoa" }));
+      const coffee = [...(cofPending.data || []), ...(cofApproved.data || [])].map((t) => ({ ...t, commodity: "coffee" }));
+      const cola = [...(colPending.data || []), ...(colApproved.data || [])].map((t) => ({ ...t, commodity: "cola" }));
+      const combined = [...cocoa, ...coffee, ...cola].sort((a, b) => {
+        const dateA = new Date(a.date || a.created_at || 0).getTime();
+        const dateB = new Date(b.date || b.created_at || 0).getTime();
+        return dateB - dateA;
+      });
+      setPendingTxns(combined);
     } catch (err) {
-      console.error("Failed to load pending queue", err);
+      console.error("Failed to load review queue", err);
     } finally {
       setLoadingPending(false);
     }
@@ -75,6 +81,17 @@ export default function Receipts() {
     try {
       await client.post(`/${txn.commodity}/${txn.id}/approve`);
       loadPending();
+    } catch (err) {
+      alert(err.response?.data?.detail || "Approval failed");
+    }
+  };
+
+  const handleApproveAndIssue = async (txn) => {
+    try {
+      if (txn.status === "pending") {
+        await client.post(`/${txn.commodity}/${txn.id}/approve`);
+      }
+      await openReceiptPrep({ ...txn, status: "approved" });
     } catch (err) {
       alert(err.response?.data?.detail || "Approval failed");
     }
@@ -168,7 +185,7 @@ export default function Receipts() {
             activeTab === "pending" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
           }`}
         >
-          <span>Pending Approvals</span>
+          <span>Pending & Approved</span>
           {pendingTxns.length > 0 && (
             <span className="bg-amber-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
               {pendingTxns.length}
@@ -296,18 +313,32 @@ export default function Receipts() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
               {pendingTxns.map((txn) => {
                 const sellerObj = sellers.find((s) => s.id === txn.seller_id);
+                const isApproved = txn.status === "approved";
                 return (
                   <div
                     key={txn.id}
-                    className="bg-white border border-amber-200 rounded-2xl p-4 shadow-xs space-y-3 flex flex-col justify-between"
+                    className={`rounded-2xl p-4 shadow-xs space-y-3 flex flex-col justify-between transition ${
+                      isApproved
+                        ? "bg-emerald-50/25 border-2 border-emerald-400"
+                        : "bg-white border border-amber-200"
+                    }`}
                   >
                     <div>
                       <div className="flex justify-between items-start">
                         <div>
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[10px] font-bold uppercase bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md">
+                            <span className="text-[10px] font-black uppercase bg-slate-900 text-white px-2 py-0.5 rounded-md">
                               {txn.commodity}
                             </span>
+                            {isApproved ? (
+                              <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-md">
+                                ✓ Ready to Print
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md">
+                                Pending Review
+                              </span>
+                            )}
                             <span className="text-xs font-bold text-slate-900">
                               {txn.seller_name || sellerObj?.name || "Seller"}
                             </span>
@@ -321,40 +352,62 @@ export default function Receipts() {
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-500 mt-1">
-                            {txn.date} · Weight: {txn.weight_kg} kg @ Nle {txn.price_per_kg}/kg
+                          <p className="text-[11px] text-slate-500 mt-1.5">
+                            {txn.date} · Weight: <span className="font-bold text-slate-800">{txn.weight_kg} kg</span> @ Nle {txn.price_per_kg}/kg
                           </p>
+                          {txn.water_percent != null && (
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              Moisture: {txn.water_percent}% · Net Wt: {txn.net_weight_kg || txn.weight_kg} kg
+                            </p>
+                          )}
                         </div>
-                        <span className="text-base font-black text-emerald-800">
-                          Nle {txn.total_price}
-                        </span>
+                        <div className="text-right">
+                          <span className="text-base font-black text-slate-900 block">
+                            Nle {txn.total_price}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {isApproved ? "Approved Total" : "Gross Payable"}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex gap-2 pt-2 border-t border-slate-100">
-                      <button
-                        onClick={() => { setRejectModalTxn(txn); setRejectReason(""); }}
-                        className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 font-semibold py-2 rounded-xl text-xs flex items-center justify-center gap-1"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        <span>Reject</span>
-                      </button>
+                    <div className="pt-2 border-t border-slate-100">
+                      {isApproved ? (
+                        <button
+                          onClick={() => openReceiptPrep(txn)}
+                          className="w-full bg-[#168821] hover:bg-[#126e1a] text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-xs transition active:scale-95 cursor-pointer"
+                        >
+                          <FileText className="w-4 h-4" />
+                          <span>Issue & Print Official Receipt</span>
+                        </button>
+                      ) : (
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => { setRejectModalTxn(txn); setRejectReason(""); }}
+                            className="bg-red-50 hover:bg-red-100 text-red-700 font-semibold px-2.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1 transition cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>Reject</span>
+                          </button>
 
-                      <button
-                        onClick={() => handleApprove(txn)}
-                        className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-2 rounded-xl text-xs flex items-center justify-center gap-1"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Approve</span>
-                      </button>
+                          <button
+                            onClick={() => handleApprove(txn)}
+                            className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-2 rounded-xl text-xs flex items-center justify-center gap-1 transition cursor-pointer"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Approve</span>
+                          </button>
 
-                      <button
-                        onClick={() => openReceiptPrep(txn)}
-                        className="flex-1 bg-emerald-800 hover:bg-emerald-900 text-white font-semibold py-2 rounded-xl text-xs flex items-center justify-center gap-1 shadow-xs"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Receipt</span>
-                      </button>
+                          <button
+                            onClick={() => handleApproveAndIssue(txn)}
+                            className="flex-1 bg-emerald-800 hover:bg-emerald-900 text-white font-semibold py-2 rounded-xl text-xs flex items-center justify-center gap-1 shadow-xs transition cursor-pointer"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>Approve & Issue</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -455,80 +508,7 @@ export default function Receipts() {
         </div>
       )}
 
-      {/* =========================================================================
-          PRINTABLE OFFICIAL RECEIPT MODAL (Spec Section 11)
-          PRINTABLE OFFICIAL RECEIPT MODAL (Spec Section 11 & Detailed Item/Account Info)
-          ========================================================================= */}
-      {selectedReceipt && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="text-center border-b pb-3">
-              <h2 className="text-base font-black text-slate-900">OFFICIAL PRODUCE RECEIPT</h2>
-              <p className="text-xs text-slate-500">{selectedReceipt.station_name || "COMIS Buying Station Network"}</p>
-              <p className="font-mono text-sm font-bold text-emerald-800 mt-1">
-                {selectedReceipt.receipt_number}
-              </p>
-            </div>
-
-            {/* Seller Info */}
-            <div className="bg-slate-50 p-3 rounded-xl text-xs space-y-1">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Seller Name:</span>
-                <span className="font-bold text-slate-900">{selectedReceipt.seller_name || "Seller"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Seller ID:</span>
-                <span className="font-mono font-bold text-slate-700">{selectedReceipt.seller_code}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Issued Date:</span>
-                <span className="text-slate-700">{new Date(selectedReceipt.issued_at).toLocaleString()}</span>
-              </div>
-            </div>
-
-            {/* Financial Details */}
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Commodity:</span>
-                <span className="font-bold uppercase text-slate-900">{selectedReceipt.transaction_type}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Gross Amount:</span>
-                <span className="font-bold text-slate-900">Nle {selectedReceipt.gross_amount}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Loan Deduction:</span>
-                <span className="font-bold text-red-600">-Nle {selectedReceipt.loan_deduction}</span>
-              </div>
-              <div className="flex justify-between py-2 text-sm font-black border-t-2 border-slate-900">
-                <span>NET CASH PAID:</span>
-                <span className="text-emerald-800">Nle {selectedReceipt.net_amount_paid}</span>
-              </div>
-            </div>
-
-            <div className="text-[10px] text-slate-400 space-y-0.5 border-t pt-2">
-              <p>Weighed / Recorded by: {selectedReceipt.recorded_by}</p>
-              <p>Authorized / Issued by: {selectedReceipt.issued_by}</p>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => window.print()}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
-              >
-                <Printer className="w-4 h-4" />
-                <span>Print</span>
-              </button>
-              <button
-                onClick={() => setSelectedReceipt(null)}
-                className="flex-1 bg-emerald-800 hover:bg-emerald-900 text-white py-2.5 rounded-xl text-xs font-semibold"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Bank Teller Landscape Official Receipt Modal */}
       <OfficialReceiptModal
         receipt={selectedReceipt}
         onClose={() => setSelectedReceipt(null)}
