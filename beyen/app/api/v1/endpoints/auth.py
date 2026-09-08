@@ -6,6 +6,7 @@ Includes password reset via email and Google OAuth authentication.
 import base64
 import json
 import secrets
+import uuid
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -32,7 +33,20 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
     if user.status != UserStatus.active:
         raise HTTPException(status_code=403, detail=f"Account is {user.status.value}. Contact a System Admin.")
 
-    token = create_access_token(user.id, user.role.value, name=user.name)
+    # Ensure produce_id is populated for Manager if missing
+    if not user.produce_id and user.role == UserRole.produce_manager:
+        user.produce_id = user.id
+        db.commit()
+        db.refresh(user)
+
+    token = create_access_token(
+        user.id,
+        user.role.value,
+        name=user.name,
+        produce_id=user.produce_id,
+        station_name=user.station_name,
+        business_name=user.business_name,
+    )
     return Token(
         access_token=token,
         role=user.role,
@@ -41,6 +55,7 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
         station_name=user.station_name,
         business_name=user.business_name,
         produce_name=user.business_name or user.station_name,
+        produce_id=user.produce_id,
     )
 
 
@@ -158,6 +173,9 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
             (User.email.ilike(email)) | (User.contact.ilike(email))
         ).first()
 
+    mode = (payload.mode or "signin").strip().lower()
+    terms_accepted = bool(payload.terms_accepted)
+
     if user:
         # Link google_id and email if missing
         if google_id and not user.google_id:
@@ -171,7 +189,20 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
         if user.status != UserStatus.active:
             raise HTTPException(status_code=403, detail=f"Account is {user.status.value}. Contact a System Admin.")
 
-        token = create_access_token(user.id, user.role.value, name=user.name)
+        # Ensure produce_id is populated for Manager if missing
+        if not user.produce_id and user.role == UserRole.produce_manager:
+            user.produce_id = user.id
+            db.commit()
+            db.refresh(user)
+
+        token = create_access_token(
+            user.id,
+            user.role.value,
+            name=user.name,
+            produce_id=user.produce_id,
+            station_name=user.station_name,
+            business_name=user.business_name,
+        )
         return Token(
             access_token=token,
             role=user.role,
@@ -180,13 +211,30 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
             station_name=user.station_name,
             business_name=user.business_name,
             produce_name=user.business_name or user.station_name,
+            produce_id=user.produce_id,
         )
 
-    # User does not exist -> Auto-register Produce Manager as PENDING
+    # User does NOT exist in the database
+    if mode == "signin":
+        raise HTTPException(
+            status_code=404,
+            detail="Account does not exist. Signup to continue."
+        )
+
+    # mode == "signup" -> Verify user confirmed terms agreement
+    if not terms_accepted:
+        raise HTTPException(
+            status_code=400,
+            detail="You must agree to the Terms of Service, User Agreement, and Privacy Policy to continue."
+        )
+
+    # Auto-register Produce Manager as PENDING
     resolved_name = name or email.split("@")[0].capitalize()
     resolved_produce = produce_name or f"{resolved_name}'s Produce"
+    new_user_id = uuid.uuid4()
 
     new_user = User(
+        id=new_user_id,
         name=resolved_name,
         contact=email,
         email=email,
@@ -196,6 +244,7 @@ def google_auth(payload: GoogleAuthRequest, db: Session = Depends(get_db)):
         status=UserStatus.pending,
         station_name=resolved_produce,
         business_name=resolved_produce,
+        produce_id=new_user_id,
     )
     db.add(new_user)
     db.commit()

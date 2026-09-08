@@ -25,7 +25,19 @@ async def lifespan(app: FastAPI):
                     conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_token VARCHAR(255)"))
                     conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_expires_at TIMESTAMP"))
                     conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)"))
+                    conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS produce_id UUID"))
+
                     conn.execute(text("ALTER TABLE sellers ADD COLUMN IF NOT EXISTS is_random BOOLEAN DEFAULT FALSE"))
+                    conn.execute(text("ALTER TABLE sellers ADD COLUMN IF NOT EXISTS produce_id UUID"))
+
+                    conn.execute(text("ALTER TABLE cocoa_transactions ADD COLUMN IF NOT EXISTS produce_id UUID"))
+                    conn.execute(text("ALTER TABLE cocoa_transactions ADD COLUMN IF NOT EXISTS station_name VARCHAR(120)"))
+                    conn.execute(text("ALTER TABLE coffee_transactions ADD COLUMN IF NOT EXISTS produce_id UUID"))
+                    conn.execute(text("ALTER TABLE coffee_transactions ADD COLUMN IF NOT EXISTS station_name VARCHAR(120)"))
+                    conn.execute(text("ALTER TABLE cola_transactions ADD COLUMN IF NOT EXISTS produce_id UUID"))
+                    conn.execute(text("ALTER TABLE cola_transactions ADD COLUMN IF NOT EXISTS station_name VARCHAR(120)"))
+
+                    conn.execute(text("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS produce_id UUID"))
                     conn.execute(text("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS station_name VARCHAR(120)"))
                     conn.execute(text("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS business_name VARCHAR(120)"))
                     conn.execute(text("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS business_address VARCHAR(255)"))
@@ -39,6 +51,18 @@ async def lifespan(app: FastAPI):
                     conn.execute(text("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS seller_contact_snapshot VARCHAR(50)"))
                     conn.execute(text("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS recorded_by_name VARCHAR(120)"))
                     conn.execute(text("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS issued_by_name VARCHAR(120)"))
+
+                    conn.execute(text("ALTER TABLE loans ADD COLUMN IF NOT EXISTS produce_id UUID"))
+                    conn.execute(text("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS produce_id UUID"))
+
+                    # Safe backfill of produce_id for existing records
+                    conn.execute(text("UPDATE users SET produce_id = id WHERE role = 'produce_manager' AND produce_id IS NULL"))
+                    conn.execute(text("UPDATE users SET produce_id = created_by WHERE role = 'produce_secretary' AND produce_id IS NULL AND created_by IS NOT NULL"))
+                    try:
+                        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_users_contact ON users(contact)"))
+                        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email ON users(email) WHERE email IS NOT NULL"))
+                    except Exception:
+                        pass
                     conn.commit()
             except Exception:
                 pass

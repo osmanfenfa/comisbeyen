@@ -50,7 +50,7 @@ export default function Home() {
     fetchSettings();
   }, []);
 
-  // Quick 1-click Approve for System Admin
+  // Quick action handlers for System Admin
   const handleApproveUser = async (userId) => {
     setApprovingId(userId);
     try {
@@ -63,28 +63,118 @@ export default function Home() {
     }
   };
 
-  // CSV Generator for Commodity Cards
-  const handleDownloadCSV = (commodity) => {
-    const filename = `${commodity}_sales_${new Date().toISOString().split("T")[0]}.csv`;
-    const rows = [
-      ["Commodity", "Produce_Name", "Date", "Total_Kg", "Total_Bags", "Total_Nle"],
-      [
-        commodity,
-        produceName || stationName || "Confidence Produce Farmers Corporation",
-        new Date().toLocaleDateString("en-GB"),
-        data?.today_kg_by_commodity?.[commodity] || 0,
-        Math.ceil((data?.today_kg_by_commodity?.[commodity] || 0) / 70),
-        data?.today_cash_paid_out || 0,
-      ]
-    ];
-    const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleSuspendUser = async (userId) => {
+    if (!confirm("Are you sure you want to suspend this user?")) return;
+    setApprovingId(userId);
+    try {
+      await client.post(`/users/${userId}/suspend`);
+      await loadDashboard();
+    } catch (err) {
+      alert(err.response?.data?.detail || "Failed to suspend user");
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const handleReactivateUser = async (userId) => {
+    setApprovingId(userId);
+    try {
+      await client.post(`/users/${userId}/reactivate`);
+      await loadDashboard();
+    } catch (err) {
+      alert(err.response?.data?.detail || "Failed to reactivate user");
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const handleDeleteUser = async (userId, userName) => {
+    if (!confirm(`Are you sure you want to permanently delete user "${userName}"? All associations will be cleaned up. This cannot be undone.`)) return;
+    setApprovingId(userId);
+    try {
+      await client.delete(`/users/${userId}`);
+      await loadDashboard();
+    } catch (err) {
+      alert(err.response?.data?.detail || "Failed to delete user");
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  // Dedicated CSV Generator for each Commodity (Cocoa, Coffee, Cola)
+  const handleDownloadCSV = async (commodity) => {
+    try {
+      const endpoint = commodity === "cocoa" ? "/cocoa/" : commodity === "coffee" ? "/coffee/" : "/cola/";
+      const { data: txns } = await client.get(endpoint);
+      const todayStr = new Date().toISOString().split("T")[0];
+      const filename = `${commodity}_sales_${todayStr}.csv`;
+      
+      const rows = [];
+      if (commodity === "cola") {
+        rows.push(["Date", "Seller Code", "Seller Name", "Contact", "Weight (Kg)", "Price/Kg (Nle)", "Total Amount (Nle)", "Station", "Status"]);
+        (txns || []).forEach((t) => {
+          rows.push([
+            t.date,
+            t.seller_code || "N/A",
+            `"${(t.seller_name || t.random_seller_name || "Walk-in").replace(/"/g, '""')}"`,
+            t.seller_contact || "N/A",
+            t.weight_kg,
+            t.price_per_kg,
+            t.total_price,
+            `"${(t.station_name || stationName || "").replace(/"/g, '""')}"`,
+            t.status
+          ]);
+        });
+      } else {
+        rows.push(["Date", "Seller Code", "Seller Name", "Contact", "Gross Weight (Kg)", "Water %", "Std %", "Net Weight (Kg)", "Price/Kg (Nle)", "Total Amount (Nle)", "Station", "Status"]);
+        (txns || []).forEach((t) => {
+          rows.push([
+            t.date,
+            t.seller_code || "N/A",
+            `"${(t.seller_name || t.random_seller_name || "Walk-in").replace(/"/g, '""')}"`,
+            t.seller_contact || "N/A",
+            t.weight_kg,
+            t.water_percent,
+            t.standard_percent,
+            t.net_weight_kg,
+            t.price_per_kg,
+            t.total_price,
+            `"${(t.station_name || stationName || "").replace(/"/g, '""')}"`,
+            t.status
+          ]);
+        });
+      }
+
+      if (!txns || txns.length === 0) {
+        const stat = data?.[commodity] || {};
+        rows.push([
+          todayStr,
+          "SUMMARY",
+          commodity.toUpperCase(),
+          "N/A",
+          stat.total_weight_kg || 0,
+          stat.highest_water_percent ? `${stat.highest_water_percent}%` : "0%",
+          "7.0%",
+          stat.total_weight_kg || 0,
+          "0",
+          stat.total_value || 0,
+          produceName || stationName || "COMIS",
+          "Summary"
+        ]);
+      }
+
+      const csvContent = "data:text/csv;charset=utf-8," + rows.map((r) => r.join(",")).join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error(`Failed to download ${commodity} CSV`, err);
+      alert(`Could not download ${commodity} CSV`);
+    }
   };
 
   return (
@@ -130,9 +220,9 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* Action badge / 1-click Approve for SaaS admin */}
-                      <div className="shrink-0 pt-0.5">
-                        {u.status === "pending" ? (
+                      {/* Action buttons for SaaS admin */}
+                      <div className="shrink-0 flex items-center gap-1.5 pt-0.5">
+                        {u.status === "pending" && (
                           <button
                             onClick={() => handleApproveUser(u.id)}
                             disabled={approvingId === u.id}
@@ -140,10 +230,34 @@ export default function Home() {
                           >
                             {approvingId === u.id ? "..." : "Approve"}
                           </button>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                            <Check className="w-3 h-3" /> Active
-                          </span>
+                        )}
+                        {u.status === "active" && u.role !== "system_admin" && (
+                          <button
+                            onClick={() => handleSuspendUser(u.id)}
+                            disabled={approvingId === u.id}
+                            className="border border-red-300 text-red-700 hover:bg-red-50 font-bold text-[10px] px-2 py-0.5 rounded-full transition cursor-pointer"
+                          >
+                            Suspend
+                          </button>
+                        )}
+                        {u.status === "suspended" && (
+                          <button
+                            onClick={() => handleReactivateUser(u.id)}
+                            disabled={approvingId === u.id}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] px-2 py-0.5 rounded-full shadow-xs transition cursor-pointer"
+                          >
+                            Reactivate
+                          </button>
+                        )}
+                        {u.role !== "system_admin" && (
+                          <button
+                            onClick={() => handleDeleteUser(u.id, u.name)}
+                            disabled={approvingId === u.id}
+                            className="text-red-500 hover:text-red-700 font-bold text-[10px] px-1.5 py-0.5 rounded transition cursor-pointer"
+                            title="Delete User"
+                          >
+                            Delete
+                          </button>
                         )}
                       </div>
                     </div>
@@ -217,14 +331,14 @@ export default function Home() {
           </div>
 
           {/* Pending Reviews Alert if any */}
-          {data?.pending_review_count > 0 && (
+          {((data?.pending_transactions_total || 0) > 0 || (data?.pending_review_count || 0) > 0) && (
             <Link
               to="/cocoa"
               className="flex items-center justify-between p-3 bg-amber-500 text-white rounded-2xl shadow-sm text-xs font-bold"
             >
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 animate-pulse text-amber-100" />
-                <span>{data.pending_review_count} Purchase(s) Awaiting Review</span>
+                <span>{(data?.pending_transactions_total || data?.pending_review_count)} Purchase(s) Awaiting Review</span>
               </div>
               <span className="underline">Review Now</span>
             </Link>
@@ -239,27 +353,31 @@ export default function Home() {
               <div className="p-4 space-y-1.5 text-xs text-slate-800">
                 <p>
                   <strong className="text-[#168821] font-bold">Total (Kg):</strong>{" "}
-                  <span className="font-bold">{data?.today_kg_by_commodity?.cocoa || 7000}</span>
+                  <span className="font-bold">{(data?.cocoa?.total_weight_kg ?? 0).toLocaleString()}</span>
                 </p>
                 <p>
                   <strong className="text-[#168821] font-bold">Total bags:</strong>{" "}
-                  <span className="font-bold">{Math.ceil((data?.today_kg_by_commodity?.cocoa || 7000) / 70)}</span>
+                  <span className="font-bold">{data?.cocoa?.total_bags ?? 0}</span>
                 </p>
                 <p>
                   <strong className="text-[#168821] font-bold">Highest Water %:</strong>{" "}
-                  <span className="font-bold">40</span>
+                  <span className="font-bold">
+                    {data?.cocoa?.highest_water_percent ? `${data.cocoa.highest_water_percent}%` : "N/A"}
+                  </span>
                 </p>
                 <p>
                   <strong className="text-[#168821] font-bold">Lowest Water %:</strong>{" "}
-                  <span className="font-bold">6</span>
+                  <span className="font-bold">
+                    {data?.cocoa?.lowest_water_percent ? `${data.cocoa.lowest_water_percent}%` : "N/A"}
+                  </span>
                 </p>
                 <p>
                   <strong className="text-[#168821] font-bold">Total Amount Bought (Nle):</strong>{" "}
-                  <span className="font-bold">{(data?.today_cash_paid_out || 400000).toLocaleString()}</span>
+                  <span className="font-bold">{(data?.cocoa?.total_value ?? 0).toLocaleString()}</span>
                 </p>
                 <p>
                   <strong className="text-[#168821] font-bold">Highest Seller:</strong>{" "}
-                  <span className="font-bold">Tamba Mangay</span>
+                  <span className="font-bold">{data?.cocoa?.highest_seller || "None yet"}</span>
                 </p>
 
                 <div className="text-right pt-2">
@@ -282,19 +400,31 @@ export default function Home() {
               <div className="p-4 space-y-1.5 text-xs text-slate-800">
                 <p>
                   <strong className="text-[#168821] font-bold">Total (Kg):</strong>{" "}
-                  <span className="font-bold">{data?.today_kg_by_commodity?.coffee || 7000}</span>
+                  <span className="font-bold">{(data?.coffee?.total_weight_kg ?? 0).toLocaleString()}</span>
                 </p>
                 <p>
                   <strong className="text-[#168821] font-bold">Total bags:</strong>{" "}
-                  <span className="font-bold">{Math.ceil((data?.today_kg_by_commodity?.coffee || 7000) / 70)}</span>
+                  <span className="font-bold">{data?.coffee?.total_bags ?? 0}</span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Highest Water %:</strong>{" "}
+                  <span className="font-bold">
+                    {data?.coffee?.highest_water_percent ? `${data.coffee.highest_water_percent}%` : "N/A"}
+                  </span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Lowest Water %:</strong>{" "}
+                  <span className="font-bold">
+                    {data?.coffee?.lowest_water_percent ? `${data.coffee.lowest_water_percent}%` : "N/A"}
+                  </span>
                 </p>
                 <p>
                   <strong className="text-[#168821] font-bold">Total Amount Bought (Nle):</strong>{" "}
-                  <span className="font-bold">{(data?.today_cash_paid_out || 400000).toLocaleString()}</span>
+                  <span className="font-bold">{(data?.coffee?.total_value ?? 0).toLocaleString()}</span>
                 </p>
                 <p>
                   <strong className="text-[#168821] font-bold">Highest Seller:</strong>{" "}
-                  <span className="font-bold">Tamba Mangay</span>
+                  <span className="font-bold">{data?.coffee?.highest_seller || "None yet"}</span>
                 </p>
 
                 <div className="text-right pt-2">
@@ -316,12 +446,20 @@ export default function Home() {
               </div>
               <div className="p-4 space-y-1.5 text-xs text-slate-800">
                 <p>
+                  <strong className="text-[#168821] font-bold">Total (Kg):</strong>{" "}
+                  <span className="font-bold">{(data?.cola?.total_weight_kg ?? 0).toLocaleString()}</span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Total bags:</strong>{" "}
+                  <span className="font-bold">{data?.cola?.total_bags ?? 0}</span>
+                </p>
+                <p>
                   <strong className="text-[#168821] font-bold">Total Amount Bought (Nle):</strong>{" "}
-                  <span className="font-bold">{(data?.today_cash_paid_out || 400000).toLocaleString()}</span>
+                  <span className="font-bold">{(data?.cola?.total_value ?? 0).toLocaleString()}</span>
                 </p>
                 <p>
                   <strong className="text-[#168821] font-bold">Highest Seller:</strong>{" "}
-                  <span className="font-bold">Tamba Mangay</span>
+                  <span className="font-bold">{data?.cola?.highest_seller || "None yet"}</span>
                 </p>
 
                 <div className="text-right pt-2">
@@ -360,6 +498,138 @@ export default function Home() {
               <span className="underline">Fix Now</span>
             </Link>
           )}
+
+          {/* Commodity Cards Grid for Secretary */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
+            {/* Cocoa Card */}
+            <div className="border-2 border-[#168821] rounded-2xl overflow-hidden bg-white shadow-xs">
+              <div className="bg-[#d4a000] text-[#0f5c18] font-black text-sm px-4 py-2">
+                Cocoa
+              </div>
+              <div className="p-4 space-y-1.5 text-xs text-slate-800">
+                <p>
+                  <strong className="text-[#168821] font-bold">Total (Kg):</strong>{" "}
+                  <span className="font-bold">{(data?.cocoa?.total_weight_kg ?? 0).toLocaleString()}</span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Total bags:</strong>{" "}
+                  <span className="font-bold">{data?.cocoa?.total_bags ?? 0}</span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Highest Water %:</strong>{" "}
+                  <span className="font-bold">
+                    {data?.cocoa?.highest_water_percent ? `${data.cocoa.highest_water_percent}%` : "N/A"}
+                  </span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Lowest Water %:</strong>{" "}
+                  <span className="font-bold">
+                    {data?.cocoa?.lowest_water_percent ? `${data.cocoa.lowest_water_percent}%` : "N/A"}
+                  </span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Total Amount Bought (Nle):</strong>{" "}
+                  <span className="font-bold">{(data?.cocoa?.total_value ?? 0).toLocaleString()}</span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Highest Seller:</strong>{" "}
+                  <span className="font-bold">{data?.cocoa?.highest_seller || "None yet"}</span>
+                </p>
+
+                <div className="text-right pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadCSV("cocoa")}
+                    className="text-[#168821] font-bold text-xs hover:underline cursor-pointer"
+                  >
+                    Download CSV
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Coffee Card */}
+            <div className="border-2 border-[#168821] rounded-2xl overflow-hidden bg-white shadow-xs">
+              <div className="bg-[#d4a000] text-[#0f5c18] font-black text-sm px-4 py-2">
+                Coffee
+              </div>
+              <div className="p-4 space-y-1.5 text-xs text-slate-800">
+                <p>
+                  <strong className="text-[#168821] font-bold">Total (Kg):</strong>{" "}
+                  <span className="font-bold">{(data?.coffee?.total_weight_kg ?? 0).toLocaleString()}</span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Total bags:</strong>{" "}
+                  <span className="font-bold">{data?.coffee?.total_bags ?? 0}</span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Highest Water %:</strong>{" "}
+                  <span className="font-bold">
+                    {data?.coffee?.highest_water_percent ? `${data.coffee.highest_water_percent}%` : "N/A"}
+                  </span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Lowest Water %:</strong>{" "}
+                  <span className="font-bold">
+                    {data?.coffee?.lowest_water_percent ? `${data.coffee.lowest_water_percent}%` : "N/A"}
+                  </span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Total Amount Bought (Nle):</strong>{" "}
+                  <span className="font-bold">{(data?.coffee?.total_value ?? 0).toLocaleString()}</span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Highest Seller:</strong>{" "}
+                  <span className="font-bold">{data?.coffee?.highest_seller || "None yet"}</span>
+                </p>
+
+                <div className="text-right pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadCSV("coffee")}
+                    className="text-[#168821] font-bold text-xs hover:underline cursor-pointer"
+                  >
+                    Download CSV
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Cola Card */}
+            <div className="border-2 border-[#168821] rounded-2xl overflow-hidden bg-white shadow-xs">
+              <div className="bg-[#d4a000] text-[#0f5c18] font-black text-sm px-4 py-2">
+                Cola
+              </div>
+              <div className="p-4 space-y-1.5 text-xs text-slate-800">
+                <p>
+                  <strong className="text-[#168821] font-bold">Total (Kg):</strong>{" "}
+                  <span className="font-bold">{(data?.cola?.total_weight_kg ?? 0).toLocaleString()}</span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Total bags:</strong>{" "}
+                  <span className="font-bold">{data?.cola?.total_bags ?? 0}</span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Total Amount Bought (Nle):</strong>{" "}
+                  <span className="font-bold">{(data?.cola?.total_value ?? 0).toLocaleString()}</span>
+                </p>
+                <p>
+                  <strong className="text-[#168821] font-bold">Highest Seller:</strong>{" "}
+                  <span className="font-bold">{data?.cola?.highest_seller || "None yet"}</span>
+                </p>
+
+                <div className="text-right pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadCSV("cola")}
+                    className="text-[#168821] font-bold text-xs hover:underline cursor-pointer"
+                  >
+                    Download CSV
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Intake summary cards */}
           <div className="border-2 border-[#168821] rounded-2xl overflow-hidden bg-white shadow-xs">

@@ -47,11 +47,18 @@ def register_seller(
     db: Session = Depends(get_db),
     current=Depends(ANY_STAFF),
 ):
-    """Any staff role can register a new seller. (spec section 2.4)"""
+    """Any staff role can register a new seller under their Produce Business."""
+    if current["role"] == UserRole.system_admin.value:
+        raise HTTPException(
+            status_code=403,
+            detail="System Admin does not register sellers. Only Produce Managers and Secretaries can register sellers."
+        )
+    tenant_produce_id = current.get("produce_id") or current["id"]
     seller_id = _generate_seller_id(db)
     seller = Seller(
         **payload.model_dump(),
         seller_id=seller_id,
+        produce_id=tenant_produce_id,
         created_by=current["id"],
     )
     db.add(seller)
@@ -69,8 +76,11 @@ def list_sellers(
     db: Session = Depends(get_db),
     current=Depends(ANY_STAFF),
 ):
-    """Search sellers by name. Active only by default."""
+    """Search sellers under this Produce Business. Active only by default."""
     query = db.query(Seller)
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        query = query.filter(Seller.produce_id == tenant_produce_id)
     if not include_inactive:
         query = query.filter(Seller.is_active == True)
     if search:
@@ -83,6 +93,10 @@ def get_seller(seller_id: uuid.UUID, db: Session = Depends(get_db), current=Depe
     seller = db.query(Seller).filter(Seller.id == seller_id).first()
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if seller.produce_id and seller.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
     return seller
 
 
@@ -97,6 +111,10 @@ def edit_seller(
     seller = db.query(Seller).filter(Seller.id == seller_id).first()
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if seller.produce_id and seller.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
     old_values = {
         "name": seller.name, "gender": seller.gender,
@@ -123,6 +141,10 @@ def deactivate_seller(
     seller = db.query(Seller).filter(Seller.id == seller_id).first()
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if seller.produce_id and seller.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
     if not seller.is_active:
         raise HTTPException(status_code=400, detail="Seller is already inactive.")
 
@@ -142,6 +164,10 @@ def reactivate_seller(
     seller = db.query(Seller).filter(Seller.id == seller_id).first()
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if seller.produce_id and seller.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
     seller.is_active = True
     db.commit()
     db.refresh(seller)
@@ -163,6 +189,10 @@ def seller_history(
     seller = db.query(Seller).filter(Seller.id == seller_id).first()
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if seller.produce_id and seller.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
     # Build loan summaries with computed balance
     loan_summaries = []
@@ -205,6 +235,10 @@ def seller_balance(
     seller = db.query(Seller).filter(Seller.id == seller_id).first()
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
+    if current["role"] != UserRole.system_admin.value:
+        tenant_produce_id = current.get("produce_id") or current["id"]
+        if seller.produce_id and seller.produce_id != tenant_produce_id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
     outstanding = sum(
         _loan_balance(loan) for loan in seller.loans if loan.status != "cleared"

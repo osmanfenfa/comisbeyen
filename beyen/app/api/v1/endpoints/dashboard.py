@@ -26,17 +26,45 @@ router = APIRouter()
 ANY_STAFF = require_role(UserRole.produce_manager, UserRole.system_admin, UserRole.produce_secretary)
 
 
-def _txn_today_stats(model, db: Session, created_by_filter=None):
-    """Count and sum today's transactions for a commodity model."""
+def _txn_today_stats(model, db: Session, created_by_filter=None, produce_id_filter=None, station_filter=None):
+    """Count and sum today's transactions for a commodity model with commodity-specific metrics."""
     today = date.today()
     query = db.query(model).filter(func.date(model.created_at) == today)
+    if produce_id_filter:
+        query = query.filter(model.produce_id == produce_id_filter)
+    if station_filter:
+        query = query.filter(model.station_name == station_filter)
     if created_by_filter:
         query = query.filter(model.created_by == created_by_filter)
     txns = query.all()
+
+    total_weight = round(sum(t.weight_kg for t in txns), 2)
+    total_val = round(sum(t.total_price for t in txns), 2)
+    total_bags = int(round(total_weight / 70.0)) if total_weight > 0 else 0
+
+    has_water = hasattr(model, "water_percent")
+    if has_water and txns:
+        highest_water = round(max(t.water_percent for t in txns), 2)
+        lowest_water = round(min(t.water_percent for t in txns), 2)
+    else:
+        highest_water = 0.0
+        lowest_water = 0.0
+
+    seller_totals = {}
+    for t in txns:
+        s_name = t.seller_name or "Walk-in Seller"
+        seller_totals[s_name] = seller_totals.get(s_name, 0.0) + t.weight_kg
+
+    highest_seller = max(seller_totals, key=seller_totals.get) if seller_totals else "None yet"
+
     return {
         "count": len(txns),
-        "total_weight_kg": round(sum(t.weight_kg for t in txns), 2),
-        "total_value": round(sum(t.total_price for t in txns), 2),
+        "total_weight_kg": total_weight,
+        "total_bags": total_bags,
+        "highest_water_percent": highest_water,
+        "lowest_water_percent": lowest_water,
+        "highest_seller": highest_seller,
+        "total_value": total_val,
         "pending": sum(1 for t in txns if t.status == TransactionStatus.pending),
         "approved": sum(1 for t in txns if t.status == TransactionStatus.approved),
         "rejected": sum(1 for t in txns if t.status == TransactionStatus.rejected),
@@ -48,40 +76,54 @@ def _txn_today_stats(model, db: Session, created_by_filter=None):
 def dashboard_summary(db: Session = Depends(get_db), current=Depends(ANY_STAFF)):
     today = date.today()
     role = current["role"]
+    tenant_produce_id = current.get("produce_id") or current["id"]
 
     if role == UserRole.produce_secretary.value:
-        # Secretary sees only their own today's submissions
+        # Secretary sees their station's or own today's submissions
         uid = current["id"]
+        sec_station = current.get("station_name")
+        cocoa = _txn_today_stats(CocoaTransaction, db, created_by_filter=None if sec_station else uid, produce_id_filter=tenant_produce_id, station_filter=sec_station)
+        coffee = _txn_today_stats(CoffeeTransaction, db, created_by_filter=None if sec_station else uid, produce_id_filter=tenant_produce_id, station_filter=sec_station)
+        cola = _txn_today_stats(ColaTransaction, db, created_by_filter=None if sec_station else uid, produce_id_filter=tenant_produce_id, station_filter=sec_station)
+        
+        pending_total = cocoa["pending"] + coffee["pending"] + cola["pending"]
+        total_gross_kg = round(cocoa["total_weight_kg"] + coffee["total_weight_kg"] + cola["total_weight_kg"], 2)
+        total_gross_nle = round(cocoa["total_value"] + coffee["total_value"] + cola["total_value"], 2)
+
         return {
             "role": role,
             "date": str(today),
-            "cocoa": _txn_today_stats(CocoaTransaction, db, created_by_filter=uid),
-            "coffee": _txn_today_stats(CoffeeTransaction, db, created_by_filter=uid),
-            "cola": _txn_today_stats(ColaTransaction, db, created_by_filter=uid),
+            "cocoa": cocoa,
+            "coffee": coffee,
+            "cola": cola,
+            "pending_transactions_total": pending_total,
+            "today_purchases_recorded": cocoa["count"] + coffee["count"] + cola["count"],
+            "today_gross_kg": total_gross_kg,
+            "today_gross_nle": total_gross_nle,
         }
 
     if role == UserRole.produce_manager.value:
-        cocoa = _txn_today_stats(CocoaTransaction, db)
-        coffee = _txn_today_stats(CoffeeTransaction, db)
-        cola = _txn_today_stats(ColaTransaction, db)
+        cocoa = _txn_today_stats(CocoaTransaction, db, produce_id_filter=tenant_produce_id)
+        coffee = _txn_today_stats(CoffeeTransaction, db, produce_id_filter=tenant_produce_id)
+        cola = _txn_today_stats(ColaTransaction, db, produce_id_filter=tenant_produce_id)
 
         pending_total = (cocoa["pending"] + coffee["pending"] + cola["pending"])
         receipts_today = (
             db.query(Receipt)
-            .filter(func.date(Receipt.issued_at) == today)
+            .filter(Receipt.produce_id == tenant_produce_id, func.date(Receipt.issued_at) == today)
             .count()
         )
         cash_out_today = round(
             db.query(func.sum(Receipt.net_amount_paid))
-            .filter(func.date(Receipt.issued_at) == today)
+            .filter(Receipt.produce_id == tenant_produce_id, func.date(Receipt.issued_at) == today)
             .scalar() or 0.0, 2
         )
         outstanding_loans = (
             db.query(Loan)
-            .filter(Loan.status.in_(["active", "overdue"]))
+            .filter(Loan.produce_id == tenant_produce_id, Loan.status.in_(["active", "overdue"]))
             .count()
         )
-        overdue_loans = db.query(Loan).filter(Loan.status == "overdue").count()
+        overdue_loans = db.query(Loan).filter(Loan.produce_id == tenant_produce_id, Loan.status == "overdue").count()
 
         return {
             "role": role,

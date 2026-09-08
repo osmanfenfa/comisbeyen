@@ -45,8 +45,11 @@ export default function Login({ initialMode = "signin" }) {
 
   // Google Sign-In Dialog
   const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [googleModalMode, setGoogleModalMode] = useState("signin"); // "signin" | "signup"
   const [googleEmail, setGoogleEmail] = useState("");
   const [googleName, setGoogleName] = useState("");
+  const [googleProduceName, setGoogleProduceName] = useState("");
+  const [googleAgreeTerms, setGoogleAgreeTerms] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
   // UI state
@@ -89,6 +92,7 @@ export default function Login({ initialMode = "signin" }) {
         role: data.role,
         name: data.name,
         userId: data.user_id,
+        produceId: data.produce_id,
         produceName: data.produce_name || data.business_name || data.station_name,
         stationName: data.station_name || data.produce_name,
       });
@@ -202,16 +206,24 @@ export default function Login({ initialMode = "signin" }) {
   }
 
   // Functional Google Authentication
-  async function executeGoogleAuth(emailVal, nameVal) {
+  async function executeGoogleAuth(emailVal, nameVal, modeVal, termsVal, customProduce) {
     setError("");
     setSuccess("");
     setGoogleLoading(true);
 
     const email = (emailVal || googleEmail || "").trim().toLowerCase();
     const name = (nameVal || googleName || "").trim() || email.split("@")[0];
+    const mode = modeVal || googleModalMode;
+    const termsAccepted = termsVal !== undefined ? termsVal : googleAgreeTerms;
 
     if (!email) {
       setError("Please enter a valid Google email address.");
+      setGoogleLoading(false);
+      return;
+    }
+
+    if (mode === "signup" && !termsAccepted) {
+      setError("You must agree to the Terms of Service, User Agreement, and Privacy Policy to continue.");
       setGoogleLoading(false);
       return;
     }
@@ -221,7 +233,9 @@ export default function Login({ initialMode = "signin" }) {
         email,
         name,
         google_id: "google_" + btoa(email).replace(/=/g, ""),
-        produce_name: produceName || `${name}'s Produce`,
+        produce_name: customProduce || googleProduceName || produceName || `${name}'s Produce`,
+        mode,
+        terms_accepted: termsAccepted,
       });
 
       // Active user logged in successfully
@@ -231,6 +245,7 @@ export default function Login({ initialMode = "signin" }) {
         role: data.role,
         name: data.name,
         userId: data.user_id,
+        produceId: data.produce_id,
         produceName: data.produce_name || data.business_name || data.station_name,
         stationName: data.station_name || data.produce_name,
       });
@@ -238,7 +253,9 @@ export default function Login({ initialMode = "signin" }) {
     } catch (err) {
       setShowGoogleModal(false);
       const detail = err.response?.data?.detail || "";
-      if (err.response?.status === 403) {
+      if (err.response?.status === 404) {
+        setError("Account does not exist. Signup to continue");
+      } else if (err.response?.status === 403) {
         setError(detail || "Your Google account is registered and currently pending System Admin approval.");
       } else {
         setError(detail || "Google authentication failed. Please try again.");
@@ -315,9 +332,23 @@ export default function Login({ initialMode = "signin" }) {
 
             {/* Feedback banners */}
             {error && (
-              <div className="mt-2.5 w-full p-2 bg-red-50/95 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2 backdrop-blur-xs">
-                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-                <span>{error}</span>
+              <div className="mt-2.5 w-full p-2.5 bg-red-50/95 border border-red-200 text-red-700 text-xs rounded-xl flex items-center justify-between gap-2 backdrop-blur-xs">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span>{error}</span>
+                </div>
+                {error.toLowerCase().includes("signup to continue") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsRegister(true);
+                      setError("");
+                    }}
+                    className="underline font-black text-[#168821] hover:text-[#0f5c18] text-xs cursor-pointer shrink-0"
+                  >
+                    Signup
+                  </button>
+                )}
               </div>
             )}
 
@@ -407,7 +438,12 @@ export default function Login({ initialMode = "signin" }) {
                 {/* Continue with Google */}
                 <button
                   type="button"
-                  onClick={() => setShowGoogleModal(true)}
+                  onClick={() => {
+                    setGoogleModalMode("signin");
+                    setGoogleAgreeTerms(false);
+                    setError("");
+                    setShowGoogleModal(true);
+                  }}
                   className="w-full h-12 bg-white/80 hover:bg-white active:scale-[0.98] border border-slate-700 text-slate-800 font-semibold py-2 sm:py-2.5 rounded-full text-xs sm:text-sm shadow-2xs flex items-center justify-center gap-2 backdrop-blur-xs transition-all cursor-pointer"
                 >
                   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
@@ -614,7 +650,12 @@ export default function Login({ initialMode = "signin" }) {
                 {/* Continue with Google */}
                 <button
                   type="button"
-                  onClick={() => setShowGoogleModal(true)}
+                  onClick={() => {
+                    setGoogleModalMode("signup");
+                    setGoogleAgreeTerms(isAgreed);
+                    setError("");
+                    setShowGoogleModal(true);
+                  }}
                   className="w-full bg-white/80 hover:bg-white active:scale-[0.98] border border-slate-700 text-slate-800 font-semibold py-2 sm:py-2.5 rounded-full text-xs sm:text-sm shadow-2xs flex items-center justify-center gap-2 backdrop-blur-xs transition-all cursor-pointer"
                 >
                   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
@@ -820,7 +861,7 @@ export default function Login({ initialMode = "signin" }) {
       )}
 
       {/* =========================================================================
-          GOOGLE SIGN-IN INTERACTIVE MODAL
+          GOOGLE SIGN-IN / SIGN-UP INTERACTIVE MODAL
           ========================================================================= */}
       {showGoogleModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
@@ -834,7 +875,7 @@ export default function Login({ initialMode = "signin" }) {
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                 </svg>
                 <h3 className="text-sm font-black text-slate-900">
-                  Sign in with Google
+                  {googleModalMode === "signup" ? "Sign up with Google" : "Sign in with Google"}
                 </h3>
               </div>
               <button
@@ -847,13 +888,15 @@ export default function Login({ initialMode = "signin" }) {
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Connect your Google identity to access COMIS. Active accounts log in immediately; new accounts register as Produce Managers.
+              {googleModalMode === "signup"
+                ? "Register your Produce Business account with your Google identity."
+                : "Sign in with your Google identity to access your COMIS account."}
             </p>
 
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                executeGoogleAuth(googleEmail, googleName);
+                executeGoogleAuth(googleEmail, googleName, googleModalMode, googleAgreeTerms, googleProduceName);
               }}
               className="space-y-3 text-xs"
             >
@@ -884,11 +927,72 @@ export default function Login({ initialMode = "signin" }) {
                 />
               </div>
 
+              {googleModalMode === "signup" && (
+                <>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Produce Name (e.g. Confidence Produce)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Kenema Central Produce"
+                      value={googleProduceName}
+                      onChange={(e) => setGoogleProduceName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 font-medium focus:ring-2 focus:ring-[#168821] focus:outline-none"
+                    />
+                  </div>
+
+                  {/* "You agree with the Terms..." mandatory agreement box */}
+                  <div className="bg-amber-50/90 border border-amber-300 p-2.5 rounded-xl space-y-2">
+                    <p className="text-[11px] font-bold text-amber-900 leading-tight">
+                      You agree with the Terms of Service, User Agreement, and Privacy Policy.
+                    </p>
+                    <div className="flex items-center gap-2 text-[10px] text-amber-800 font-medium">
+                      <button
+                        type="button"
+                        onClick={() => { setLegalModalTab("terms"); setShowLegalModal(true); }}
+                        className="underline hover:text-emerald-800 cursor-pointer"
+                      >
+                        Terms
+                      </button>
+                      <span>•</span>
+                      <button
+                        type="button"
+                        onClick={() => { setLegalModalTab("agreement"); setShowLegalModal(true); }}
+                        className="underline hover:text-emerald-800 cursor-pointer"
+                      >
+                        User Agreement
+                      </button>
+                      <span>•</span>
+                      <button
+                        type="button"
+                        onClick={() => { setLegalModalTab("privacy"); setShowLegalModal(true); }}
+                        className="underline hover:text-emerald-800 cursor-pointer"
+                      >
+                        Privacy Policy
+                      </button>
+                    </div>
+
+                    <label className="flex items-start gap-2 pt-1 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={googleAgreeTerms}
+                        onChange={(e) => setGoogleAgreeTerms(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-amber-400 text-[#168821] focus:ring-[#168821]"
+                      />
+                      <span className="text-[11px] font-bold text-slate-800 leading-snug">
+                        Yes, I agree to the Terms and want to continue
+                      </span>
+                    </label>
+                  </div>
+                </>
+              )}
+
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowGoogleModal(false)}
-                  className="flex-1 py-2 border border-slate-300 text-slate-700 font-bold rounded-full hover:bg-slate-50 transition"
+                  className="flex-1 py-2 border border-slate-300 text-slate-700 font-bold rounded-full hover:bg-slate-50 transition cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -897,7 +1001,11 @@ export default function Login({ initialMode = "signin" }) {
                   disabled={googleLoading}
                   className="flex-1 py-2 bg-[#168821] hover:bg-[#126e1a] text-white font-bold rounded-full shadow-sm transition disabled:opacity-50 cursor-pointer"
                 >
-                  {googleLoading ? "Connecting..." : "Continue"}
+                  {googleLoading
+                    ? "Connecting..."
+                    : googleModalMode === "signup"
+                    ? "Yes, Continue"
+                    : "Continue"}
                 </button>
               </div>
             </form>

@@ -60,6 +60,7 @@ class UserOut(BaseModel):
     email: str | None = None
     phone_number: str | None = None
     gender: str | None = None
+    produce_id: uuid.UUID | None = None
     created_at: datetime
 
     class Config:
@@ -79,6 +80,7 @@ class UserListOut(BaseModel):
     email: str | None = None
     phone_number: str | None = None
     gender: str | None = None
+    produce_id: uuid.UUID | None = None
     created_at: datetime
 
     class Config:
@@ -100,6 +102,8 @@ class GoogleAuthRequest(BaseModel):
     name: str | None = None
     google_id: str | None = None
     produce_name: str | None = None
+    mode: str | None = "signin"  # "signin" or "signup"
+    terms_accepted: bool | None = False
 
 
 class Token(BaseModel):
@@ -111,4 +115,5 @@ class Token(BaseModel):
     station_name: str | None = None
     business_name: str | None = None
     produce_name: str | None = None
+    produce_id: uuid.UUID | None = None
 

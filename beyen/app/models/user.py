@@ -31,13 +31,14 @@ class User(Base):
     station_name: Mapped[str] = mapped_column(String(120), nullable=True)  # Manager/Secretary station scope
     business_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
     address: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    email: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    email: Mapped[str | None] = mapped_column(String(120), nullable=True, unique=True, index=True)
     phone_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
     gender: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     reset_password_token: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     reset_password_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     google_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
+    produce_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True, index=True)  # Root tenant ID (Manager ID)
 
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=True)
     approved_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=True)
