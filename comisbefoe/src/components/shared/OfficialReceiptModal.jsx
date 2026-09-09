@@ -214,10 +214,6 @@ export default function OfficialReceiptModal({ receipt, onClose }) {
                   <span>Authorized: {receipt.issued_by_name || "Manager"}</span>
                   <span className="text-slate-400 font-mono">Sign: ____________</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span>Seller Acknowledgement:</span>
-                  <span className="text-slate-400 font-mono">Sign: ____________</span>
-                </div>
               </div>
             </div>
 
@@ -225,7 +221,7 @@ export default function OfficialReceiptModal({ receipt, onClose }) {
 
           {/* Bottom Security Perforation Line */}
           <div className="pt-2 text-center text-[9px] text-slate-400 border-t border-dashed border-slate-300">
-            • Valid Official Receipt Voucher · Keep for accounting and tax records •
+            • Valid Official Receipt Voucher ·
           </div>
 
         </div>
