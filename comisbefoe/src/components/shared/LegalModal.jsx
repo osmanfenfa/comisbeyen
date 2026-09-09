@@ -76,15 +76,13 @@ export default function LegalModal({ isOpen, initialTab = "terms", onClose, onAg
             <div className="space-y-3">
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
                 <h4 className="font-extrabold text-[#0f5c18] text-sm mb-1">Terms of Service Overview</h4>
-                <p className="text-emerald-900 text-[11px] leading-relaxed">
-                  Governing the use of the COMIS platform by registered buying-station businesses, Produce Managers, and Secretaries. Governing Law: Republic of Sierra Leone.
-                </p>
+                
               </div>
 
               <div>
                 <h5 className="font-bold text-slate-900 mb-1">1. Acceptance of Terms</h5>
                 <p className="leading-relaxed">
-                  These Terms of Service ("Terms") constitute a legally binding agreement between <strong>COMIS World Produce</strong> and the produce-buying business registering a Produce Business account. By registering, accessing, or using COMIS, you agree to be bound by these Terms.
+                  These Terms of Service ("Terms") constitute a legally binding agreement between <strong>COMIS</strong> and the produce-buying business registering a Produce Business account. By registering, accessing, or using COMIS, you agree to be bound by these Terms.
                 </p>
               </div>
 
@@ -115,9 +113,7 @@ export default function LegalModal({ isOpen, initialTab = "terms", onClose, onAg
             <div className="space-y-3">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
                 <h4 className="font-extrabold text-amber-900 text-sm mb-1">Individual User Agreement</h4>
-                <p className="text-amber-800 text-[11px] leading-relaxed">
-                  Governing individual staff access for System Admins, Produce Managers, and Produce Secretaries operating COMIS.
-                </p>
+                
               </div>
 
               <div>
@@ -154,9 +150,7 @@ export default function LegalModal({ isOpen, initialTab = "terms", onClose, onAg
             <div className="space-y-3">
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
                 <h4 className="font-extrabold text-blue-900 text-sm mb-1">COMIS Privacy Policy</h4>
-                <p className="text-blue-800 text-[11px] leading-relaxed">
-                  Explains how COMIS collects, protects, stores, and uses data relating to staff, buying operations, and local produce sellers.
-                </p>
+                
               </div>
 
               <div>
@@ -176,7 +170,7 @@ export default function LegalModal({ isOpen, initialTab = "terms", onClose, onAg
               <div>
                 <h5 className="font-bold text-slate-900 mb-1">3. Data Security & Contact</h5>
                 <p className="leading-relaxed">
-                  We implement encrypted transmission, hashed passwords, and strict role segregation. For privacy requests or questions, contact our Data Protection Officer at: <a href="mailto:comisworldproduce@gmail.com" className="font-bold text-emerald-700">comisworldproduce@gmail.com</a>.
+                  We implemented data security to ensure your data is safe. For privacy requests or questions, contact our Data Protection Officer at: <a href="mailto:comisworldproduce@gmail.com" className="font-bold text-emerald-700">comisworldproduce@gmail.com</a>.
                 </p>
               </div>
             </div>
