@@ -170,7 +170,7 @@ export default function Login({ initialMode = "signin" }) {
       await client.post("/auth/forgot-password", {
         email: forgotEmail.trim(),
       });
-      setForgotSuccess("Instructions and 6-digit code sent from comisworldproduce@gmail.com! Please check your inbox.");
+      setForgotSuccess("Instructions and 6-digit code sent. Please check your inbox.");
       setForgotStep(2);
     } catch (err) {
       setForgotError(err.response?.data?.detail || "Failed to send reset code. Please try again.");
@@ -813,9 +813,6 @@ export default function Login({ initialMode = "signin" }) {
                     {forgotStep === 1 ? "Reset Your Password" : "Enter Verification Code"}
                   </h3>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Dispatched from official email: <strong className="text-emerald-700">comisworldproduce@gmail.com</strong>
-                </p>
               </div>
               <button
                 type="button"
