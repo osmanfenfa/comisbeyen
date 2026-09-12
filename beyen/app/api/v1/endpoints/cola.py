@@ -111,9 +111,11 @@ def edit_purchase(
         raise HTTPException(status_code=403, detail="Secretary cannot edit a finalized transaction.")
 
     if txn.status == TransactionStatus.finalized:
-        old_snap = {"weight_kg": txn.weight_kg, "price_per_kg": txn.price_per_kg, "total_price": txn.total_price}
+        old_snap = {"weight_kg": txn.weight_kg, "bags": txn.bags, "price_per_kg": txn.price_per_kg, "total_price": txn.total_price}
         total_price = _compute_cola(payload)
         txn.weight_kg = payload.weight_kg
+        if payload.bags is not None:
+            txn.bags = payload.bags
         txn.price_per_kg = payload.price_per_kg
         txn.total_price = total_price
         db.commit()
@@ -125,9 +127,11 @@ def edit_purchase(
     if txn.status not in (TransactionStatus.pending, TransactionStatus.rejected):
         raise HTTPException(status_code=400, detail="Only PENDING or REJECTED transactions can be edited.")
 
-    old_snap = {"weight_kg": txn.weight_kg, "price_per_kg": txn.price_per_kg, "total_price": txn.total_price}
+    old_snap = {"weight_kg": txn.weight_kg, "bags": txn.bags, "price_per_kg": txn.price_per_kg, "total_price": txn.total_price}
     total_price = _compute_cola(payload)
     txn.weight_kg = payload.weight_kg
+    if payload.bags is not None:
+        txn.bags = payload.bags
     txn.price_per_kg = payload.price_per_kg
     txn.total_price = total_price
     txn.status = TransactionStatus.pending

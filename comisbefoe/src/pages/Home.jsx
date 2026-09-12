@@ -5,8 +5,9 @@ import { useAuthStore } from "../store/authStore.js";
 import { useAppStore } from "../store/appStore.js";
 import { 
   AlertTriangle, CheckCircle2, Clock, 
-  User as UserIcon, Check, RefreshCw
+  User as UserIcon, Check, RefreshCw, Truck
 } from "lucide-react";
+import SupplyModal from "../components/shared/SupplyModal.jsx";
 
 export default function Home() {
   const { role, name, stationName, produceName } = useAuthStore();
@@ -14,6 +15,8 @@ export default function Home() {
   const [data, setData] = useState(null);
   const [adminUsers, setAdminUsers] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [supplies, setSupplies] = useState([]);
+  const [supplyModalOpen, setSupplyModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [approvingId, setApprovingId] = useState(null);
@@ -24,6 +27,16 @@ export default function Home() {
     try {
       const resp = await client.get("/dashboard/summary");
       setData(resp.data);
+
+      // If Produce Manager, fetch supplies
+      if (role === "produce_manager") {
+        try {
+          const suppliesRes = await client.get("/supplies/");
+          setSupplies(suppliesRes.data || []);
+        } catch {
+          // Graceful fallback
+        }
+      }
 
       // If Admin, fetch users and audit logs to render the mockup cards
       if (role === "system_admin") {
@@ -48,6 +61,9 @@ export default function Home() {
   useEffect(() => {
     loadDashboard();
     fetchSettings();
+    const handleOpenSupply = () => setSupplyModalOpen(true);
+    window.addEventListener("open-supply-modal", handleOpenSupply);
+    return () => window.removeEventListener("open-supply-modal", handleOpenSupply);
   }, []);
 
   // Quick action handlers for System Admin
@@ -325,9 +341,19 @@ export default function Home() {
           ========================================================================= */}
       {role === "produce_manager" && (
         <div className="space-y-4">
-          {/* Main Gold Banner: Today Sales Analysis */}
-          <div className="w-full bg-[#d4a000] text-[#0f5c18] font-black text-center py-2.5 rounded-2xl tracking-wider text-base shadow-xs">
-            Today Sales Analysis
+          {/* Main Action Bar: Today Sales Analysis Banner & Supply Produce Button */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex-1 bg-[#d4a000] text-[#0f5c18] font-black text-center py-2.5 rounded-2xl tracking-wider text-base shadow-xs">
+              Today Sales Analysis
+            </div>
+            <button
+              type="button"
+              onClick={() => setSupplyModalOpen(true)}
+              className="px-5 py-2.5 bg-[#168821] hover:bg-[#126e1a] text-white font-black text-xs sm:text-sm rounded-2xl shadow-sm transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer shrink-0"
+            >
+              <Truck className="w-4 h-4 stroke-[2.2]" />
+              <span>Record Supply</span>
+            </button>
           </div>
 
           {/* Pending Reviews Alert if any */}
@@ -407,18 +433,6 @@ export default function Home() {
                   <span className="font-bold">{data?.coffee?.total_bags ?? 0}</span>
                 </p>
                 <p>
-                  <strong className="text-[#168821] font-bold">Highest Water %:</strong>{" "}
-                  <span className="font-bold">
-                    {data?.coffee?.highest_water_percent ? `${data.coffee.highest_water_percent}%` : "N/A"}
-                  </span>
-                </p>
-                <p>
-                  <strong className="text-[#168821] font-bold">Lowest Water %:</strong>{" "}
-                  <span className="font-bold">
-                    {data?.coffee?.lowest_water_percent ? `${data.coffee.lowest_water_percent}%` : "N/A"}
-                  </span>
-                </p>
-                <p>
                   <strong className="text-[#168821] font-bold">Total Amount Bought (Nle):</strong>{" "}
                   <span className="font-bold">{(data?.coffee?.total_value ?? 0).toLocaleString()}</span>
                 </p>
@@ -472,6 +486,77 @@ export default function Home() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Recent Outgoing Produce Supplies / Sales */}
+          <div className="border-2 border-[#168821] rounded-2xl overflow-hidden bg-white shadow-xs">
+            <div className="bg-[#d4a000] py-2 px-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Truck className="w-4 h-4 text-[#0f5c18]" />
+                <h3 className="text-[#0f5c18] font-black text-sm uppercase tracking-wide">
+                  Recent Produce Supplies / Sales ({supplies.length})
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSupplyModalOpen(true)}
+                className="text-xs font-bold text-[#0f5c18] hover:underline cursor-pointer"
+              >
+                + New Supply
+              </button>
+            </div>
+
+            <div className="p-4">
+              {supplies.length === 0 ? (
+                <div className="text-center py-6 text-xs text-slate-400">
+                  <p className="font-semibold text-slate-500 mb-1">No produce supplies recorded yet.</p>
+                  <p>When you aggregate and sell produce to buyer companies, record it using the "Record Supply" button.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500 uppercase text-[10px] font-bold">
+                        <th className="py-2 px-2">Date</th>
+                        <th className="py-2 px-2">Commodity</th>
+                        <th className="py-2 px-2">Total Weight</th>
+                        <th className="py-2 px-2">Bags</th>
+                        <th className="py-2 px-2">Buyer Company</th>
+                        <th className="py-2 px-2">Witness</th>
+                        <th className="py-2 px-2 text-right">Value (Nle)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {supplies.slice(0, 10).map((s) => (
+                        <tr key={s.id} className="hover:bg-slate-50 font-medium text-slate-800">
+                          <td className="py-2.5 px-2 font-mono">{s.date}</td>
+                          <td className="py-2.5 px-2 capitalize">
+                            <span className="font-bold text-slate-900">{s.commodity}</span>
+                            {s.commodity === "cocoa" && s.water_percent > 0 && (
+                              <span className="text-[10px] text-slate-400 block font-normal">
+                                {s.water_percent}% water
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2 font-bold text-slate-900">{s.total_kg} kg</td>
+                          <td className="py-2.5 px-2">{s.total_bags} bags</td>
+                          <td className="py-2.5 px-2">
+                            <div className="font-bold text-emerald-900">{s.company_name}</div>
+                            {s.company_contact && (
+                              <div className="text-[10px] text-slate-400 font-mono">{s.company_contact}</div>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2 text-slate-600">{s.witness_name}</td>
+                          <td className="py-2.5 px-2 text-right font-bold text-emerald-800">
+                            {s.total_value != null ? `Nle ${s.total_value.toLocaleString()}` : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -653,6 +738,13 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Supply Produce Modal (Produce Manager) */}
+      <SupplyModal
+        isOpen={supplyModalOpen}
+        onClose={() => setSupplyModalOpen(false)}
+        onSuccess={loadDashboard}
+      />
     </div>
   );
 }

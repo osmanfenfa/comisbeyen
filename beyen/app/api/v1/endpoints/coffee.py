@@ -20,7 +20,7 @@ from app.schemas.coffee import (
     CoffeeTransactionOut, RejectPayload,
 )
 from app.schemas.receipt import ReceiptOut
-from app.services.pricing import calculate_moisture_deduction_price, calculate_loan_balance
+from app.services.pricing import calculate_direct_price, calculate_loan_balance
 from app.services.audit import log_action
 
 router = APIRouter()
@@ -29,21 +29,8 @@ MANAGER_OR_ADMIN = require_role(UserRole.produce_manager, UserRole.system_admin)
 ANY_STAFF = require_role(UserRole.produce_manager, UserRole.system_admin, UserRole.produce_secretary)
 
 
-def _get_standard_percent(db: Session) -> float:
-    row = db.query(AppSettings).filter(AppSettings.id == "singleton").first()
-    return row.standard_moisture_percent if row else 7.0
-
-
-def _compute(payload, standard_percent: float):
-    try:
-        return calculate_moisture_deduction_price(
-            weight_kg=payload.weight_kg,
-            water_percent=payload.water_percent,
-            standard_percent=standard_percent,
-            price_per_kg=payload.price_per_kg,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+def _compute_price(payload) -> float:
+    return calculate_direct_price(payload.weight_kg, payload.price_per_kg)
 
 
 @router.post("/", response_model=CoffeeTransactionOut, status_code=201)
@@ -52,8 +39,7 @@ def record_coffee_purchase(
     db: Session = Depends(get_db),
     current=Depends(ANY_STAFF),
 ):
-    standard_percent = _get_standard_percent(db)
-    result = _compute(payload, standard_percent)
+    total_price = _compute_price(payload)
 
     tenant_produce_id = current.get("produce_id") or current["id"]
 
@@ -84,9 +70,9 @@ def record_coffee_purchase(
     txn = CoffeeTransaction(
         seller_id=seller_id,
         **txn_data,
-        standard_percent=standard_percent,
-        net_weight_kg=result["net_weight_kg"],
-        total_price=result["total_price"],
+        standard_percent=0.0,
+        net_weight_kg=payload.weight_kg,
+        total_price=total_price,
         status=TransactionStatus.pending,
         produce_id=tenant_produce_id,
         station_name=current.get("station_name"),
@@ -122,17 +108,20 @@ def edit_purchase(
     if is_secretary and txn.status == TransactionStatus.finalized:
         raise HTTPException(status_code=403, detail="Secretary cannot edit a finalized transaction.")
 
+    total_price = _compute_price(payload)
+
     if txn.status == TransactionStatus.finalized:
-        old_snap = {"weight_kg": txn.weight_kg, "water_percent": txn.water_percent,
+        old_snap = {"weight_kg": txn.weight_kg, "bags": txn.bags,
                     "price_per_kg": txn.price_per_kg, "net_weight_kg": txn.net_weight_kg,
                     "total_price": txn.total_price}
-        standard_percent = _get_standard_percent(db)
-        result = _compute(payload, standard_percent)
         txn.weight_kg = payload.weight_kg
-        txn.water_percent = payload.water_percent
+        if payload.bags is not None:
+            txn.bags = payload.bags
         txn.price_per_kg = payload.price_per_kg
-        txn.net_weight_kg = result["net_weight_kg"]
-        txn.total_price = result["total_price"]
+        txn.net_weight_kg = payload.weight_kg
+        txn.total_price = total_price
+        txn.water_percent = 0.0
+        txn.standard_percent = 0.0
         db.commit()
         db.refresh(txn)
         log_action(db, current["id"], current["role"], "correct_finalized", "CoffeeTransaction",
@@ -142,14 +131,15 @@ def edit_purchase(
     if txn.status not in (TransactionStatus.pending, TransactionStatus.rejected):
         raise HTTPException(status_code=400, detail="Only PENDING or REJECTED transactions can be edited.")
 
-    old_snap = {"weight_kg": txn.weight_kg, "water_percent": txn.water_percent, "price_per_kg": txn.price_per_kg}
-    standard_percent = _get_standard_percent(db)
-    result = _compute(payload, standard_percent)
+    old_snap = {"weight_kg": txn.weight_kg, "bags": txn.bags, "price_per_kg": txn.price_per_kg}
     txn.weight_kg = payload.weight_kg
-    txn.water_percent = payload.water_percent
+    if payload.bags is not None:
+        txn.bags = payload.bags
     txn.price_per_kg = payload.price_per_kg
-    txn.net_weight_kg = result["net_weight_kg"]
-    txn.total_price = result["total_price"]
+    txn.net_weight_kg = payload.weight_kg
+    txn.total_price = total_price
+    txn.water_percent = 0.0
+    txn.standard_percent = 0.0
     txn.status = TransactionStatus.pending
     txn.rejection_reason = None
     db.commit()

@@ -4,8 +4,7 @@ import { Printer, X, Building, Phone, MapPin } from "lucide-react";
 export default function OfficialReceiptModal({ receipt, onClose }) {
   if (!receipt) return null;
 
-  const isMoistureCommodity =
-    receipt.transaction_type === "cocoa" || receipt.transaction_type === "coffee";
+  const isMoistureCommodity = receipt.transaction_type === "cocoa";
 
   // Use Produce business name or station name. Zero COMIS platform branding.
   const businessName =
@@ -117,6 +116,12 @@ export default function OfficialReceiptModal({ receipt, onClose }) {
                 </div>
 
                 <div className="space-y-1 text-[11px]">
+                  <div className="flex justify-between py-0.5 border-b border-slate-200/60">
+                    <span className="text-slate-600">Total Bags:</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {receipt.bags ?? 1}
+                    </span>
+                  </div>
                   <div className="flex justify-between py-0.5 border-b border-slate-200/60">
                     <span className="text-slate-600">Scale Gross Weight:</span>
                     <span className="font-mono font-bold text-slate-900">

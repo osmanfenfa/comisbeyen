@@ -5,21 +5,22 @@ from app.models.transaction_status import TransactionStatus
 
 
 class CoffeeTransactionCreate(BaseModel):
-    seller_id: uuid.UUID
     seller_id: uuid.UUID | None = None
     random_seller_name: str | None = None
     random_seller_contact: str | None = None
     date: date
     weight_kg: float
-    water_percent: float
+    bags: int | None = 1
     price_per_kg: float
+    water_percent: float | None = 0.0
 
 
 class CoffeeTransactionEdit(BaseModel):
     """Used to correct a REJECTED or PENDING transaction before (re)submitting."""
     weight_kg: float
-    water_percent: float
+    bags: int | None = 1
     price_per_kg: float
+    water_percent: float | None = 0.0
 
 
 class RejectPayload(BaseModel):
@@ -31,11 +32,12 @@ class CoffeeTransactionOut(BaseModel):
     seller_id: uuid.UUID
     date: date
     weight_kg: float
-    water_percent: float
-    standard_percent: float
+    bags: int | None = 1
     price_per_kg: float
-    net_weight_kg: float
     total_price: float
+    water_percent: float | None = 0.0
+    standard_percent: float | None = 0.0
+    net_weight_kg: float | None = None
     status: TransactionStatus
     rejection_reason: str | None
     created_by: uuid.UUID

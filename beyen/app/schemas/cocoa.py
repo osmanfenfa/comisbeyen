@@ -5,12 +5,12 @@ from app.models.transaction_status import TransactionStatus
 
 
 class CocoaTransactionCreate(BaseModel):
-    seller_id: uuid.UUID
     seller_id: uuid.UUID | None = None
     random_seller_name: str | None = None
     random_seller_contact: str | None = None
     date: date
     weight_kg: float
+    bags: int | None = 1
     water_percent: float
     price_per_kg: float
 
@@ -18,6 +18,7 @@ class CocoaTransactionCreate(BaseModel):
 class CocoaTransactionEdit(BaseModel):
     """Used to correct a REJECTED or PENDING transaction before (re)submitting."""
     weight_kg: float
+    bags: int | None = 1
     water_percent: float
     price_per_kg: float
 
@@ -31,6 +32,7 @@ class CocoaTransactionOut(BaseModel):
     seller_id: uuid.UUID
     date: date
     weight_kg: float
+    bags: int | None = 1
     water_percent: float
     standard_percent: float
     price_per_kg: float

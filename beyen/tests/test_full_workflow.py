@@ -120,8 +120,8 @@ def test_full_comis_workflow(client):
     cocoa_txn = resp.json()
     cocoa_id = cocoa_txn["id"]
     assert cocoa_txn["status"] == "pending"
-    assert cocoa_txn["net_weight_kg"] == 33.3
-    assert cocoa_txn["total_price"] == 1332.0
+    assert cocoa_txn["net_weight_kg"] == 37.32
+    assert cocoa_txn["total_price"] == 1492.80
 
     # Secretary rejects cocoa transaction with reason (Secretary has staff permissions)
     resp = client.post(f"/api/v1/cocoa/{cocoa_id}/reject", headers=sec_headers, json={
@@ -140,9 +140,9 @@ def test_full_comis_workflow(client):
     assert resp.status_code == 200
     assert resp.json()["status"] == "pending"
     assert resp.json()["rejection_reason"] is None
-    # 12.0 - 7.0 = 5.0 deduction; 40 - 5 = 35.0 net; 35 * 40 = 1400.0 total
-    assert resp.json()["net_weight_kg"] == 35.0
-    assert resp.json()["total_price"] == 1400.0
+    # 12.0 - 7.0 = 5.0% excess; 40 * 0.05 = 2.0 kg deduction; 40 - 2.0 = 38.0 kg net; 38 * 40 = 1520.0 total
+    assert resp.json()["net_weight_kg"] == 38.0
+    assert resp.json()["total_price"] == 1520.0
 
     # Secretary approves (Secretary can approve and issue out receipt)
     resp = client.post(f"/api/v1/cocoa/{cocoa_id}/approve", headers=sec_headers)
@@ -154,49 +154,58 @@ def test_full_comis_workflow(client):
     assert resp.status_code == 200
     receipt = resp.json()
     assert receipt["receipt_number"].startswith("COC-")
-    assert receipt["gross_amount"] == 1400.0
-    assert receipt["net_amount_paid"] == 1400.0
+    assert receipt["gross_amount"] == 1520.0
+    assert receipt["net_amount_paid"] == 1520.0
 
     # Verify transaction is now finalized
     resp = client.get(f"/api/v1/cocoa/{cocoa_id}", headers=mgr_headers)
     assert resp.json()["status"] == "finalized"
 
     # -----------------------------------------------------------------------
-    # 4. Coffee & Cola Workflows
+    # 4. Coffee & Cola Workflows (No moisture calculation, Bags recorded)
     # -----------------------------------------------------------------------
-    # Coffee transaction
+    # Coffee transaction (50kg @ 30 price, flat pricing 1500, 2 bags, no moisture deduction)
     resp = client.post("/api/v1/coffee/", headers=sec_headers, json={
         "seller_id": seller_id,
         "date": "2026-09-05",
         "weight_kg": 50.0,
-        "water_percent": 10.0,
+        "bags": 2,
         "price_per_kg": 30.0,
     })
     assert resp.status_code == 201
-    coffee_id = resp.json()["id"]
+    coffee_txn = resp.json()
+    assert coffee_txn["bags"] == 2
+    assert coffee_txn["total_price"] == 1500.0
+    assert coffee_txn["net_weight_kg"] == 50.0
+    coffee_id = coffee_txn["id"]
+
     # Manager approves & issues receipt
     client.post(f"/api/v1/coffee/{coffee_id}/approve", headers=mgr_headers)
     resp = client.post(f"/api/v1/coffee/{coffee_id}/issue-receipt", headers=mgr_headers)
     assert resp.status_code == 200
     assert resp.json()["receipt_number"].startswith("COF-")
+    assert resp.json()["bags"] == 2
 
-    # Cola nut transaction (direct pricing, manual override test)
+    # Cola nut transaction (direct pricing, 1 bag, manual override test)
     resp = client.post("/api/v1/cola/", headers=sec_headers, json={
         "seller_id": seller_id,
         "date": "2026-09-05",
         "weight_kg": 20.0,
+        "bags": 1,
         "price_per_kg": 15.0,
         "manual_total_override": 320.0,
     })
     assert resp.status_code == 201
     cola_txn = resp.json()
     assert cola_txn["total_price"] == 320.0
+    assert cola_txn["bags"] == 1
     cola_id = cola_txn["id"]
 
     client.post(f"/api/v1/cola/{cola_id}/approve", headers=mgr_headers)
     resp = client.post(f"/api/v1/cola/{cola_id}/issue-receipt", headers=mgr_headers)
     assert resp.status_code == 200
     assert resp.json()["receipt_number"].startswith("COL-")
+    assert resp.json()["bags"] == 1
 
     # -----------------------------------------------------------------------
     # 5. Loan Lifecycle & Deduction
@@ -297,8 +306,18 @@ def test_full_comis_workflow(client):
     assert resp.status_code == 200
     assert len(resp.json()["receipts"]) >= 3
 
+    # System Admin must NOT see receipts or reports of any produce store (403 Forbidden)
+    resp = client.get("/api/v1/receipts/", headers=admin_headers)
+    assert resp.status_code == 403, "System Admin should be forbidden from viewing receipts"
+
+    resp = client.get("/api/v1/reports/produce", headers=admin_headers)
+    assert resp.status_code == 403, "System Admin should be forbidden from viewing produce reports"
+
+    resp = client.get("/api/v1/reports/produce/export?format=pdf", headers=admin_headers)
+    assert resp.status_code == 403, "System Admin should be forbidden from exporting produce reports"
+
     # -----------------------------------------------------------------------
-    # 9. Audit Logs
+    # 9. Audit Logs (System Admin keeps full log visibility)
     # -----------------------------------------------------------------------
     resp = client.get("/api/v1/audit-logs/", headers=admin_headers)
     assert resp.status_code == 200
@@ -308,4 +327,53 @@ def test_full_comis_workflow(client):
     assert "create" in actions
     assert "approve" in actions
     assert "issue_receipt" in actions
+
+    # -----------------------------------------------------------------------
+    # 10. Produce Manager Supply Workflow (Aggregated produce sales)
+    # -----------------------------------------------------------------------
+    # System Admin cannot create supply sale -> 403 Forbidden
+    resp = client.post("/api/v1/supplies/", headers=admin_headers, json={
+        "commodity": "cocoa",
+        "total_kg": 1200.0,
+        "total_bags": 20,
+        "water_percent": 7.0,
+        "company_name": "Prohibited Test Corp",
+        "witness_name": "Test Witness",
+    })
+    assert resp.status_code == 403
+
+    # Produce Manager records a produce supply/sale to a buyer company
+    resp = client.post("/api/v1/supplies/", headers=mgr_headers, json={
+        "commodity": "cocoa",
+        "date": "2026-09-05",
+        "total_kg": 1500.0,
+        "total_bags": 25,
+        "water_percent": 7.2,
+        "company_name": "Sierra Produce Exporters SL Ltd",
+        "company_address": "Kissy Dockyard, Freetown",
+        "company_contact": "+23278889900",
+        "witness_name": "Alhaji Bangura",
+        "price_per_kg": 45.0,
+        "total_value": 67500.0,
+        "notes": "Truck SL-AA-902",
+    })
+    assert resp.status_code == 201
+    supply = resp.json()
+    assert supply["commodity"] == "cocoa"
+    assert supply["total_kg"] == 1500.0
+    assert supply["total_bags"] == 25
+    assert supply["company_name"] == "Sierra Produce Exporters SL Ltd"
+    assert supply["witness_name"] == "Alhaji Bangura"
+    supply_id = supply["id"]
+
+    # Manager retrieves supply list
+    resp = client.get("/api/v1/supplies/", headers=mgr_headers)
+    assert resp.status_code == 200
+    supplies_list = resp.json()
+    assert len(supplies_list) >= 1
+    assert any(s["id"] == supply_id for s in supplies_list)
+
+    # Produce Secretary can view supply list
+    resp = client.get("/api/v1/supplies/", headers=sec_headers)
+    assert resp.status_code == 200
 

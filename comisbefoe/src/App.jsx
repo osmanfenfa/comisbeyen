@@ -127,21 +127,21 @@ export default function App() {
             }
           />
 
-          {/* Receipts & Pending Verification (Manager & Admin) */}
+          {/* Receipts & Pending Verification (Manager & Secretary only) */}
           <Route
             path="/receipts"
             element={
-              <ProtectedRoute roles={["produce_manager", "system_admin", "produce_secretary"]}>
+              <ProtectedRoute roles={["produce_manager", "produce_secretary"]}>
                 <Receipts />
               </ProtectedRoute>
             }
           />
 
-          {/* Reporting & Analytics */}
+          {/* Reporting & Analytics (Manager & Secretary only) */}
           <Route
             path="/reports"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute roles={["produce_manager", "produce_secretary"]}>
                 <Reports />
               </ProtectedRoute>
             }

@@ -1,21 +1,22 @@
 import uuid
 from datetime import date, datetime
-from sqlalchemy import ForeignKey, Float, Date, DateTime, Enum, String
+from sqlalchemy import ForeignKey, Float, Integer, Date, DateTime, Enum, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 from app.models.transaction_status import TransactionStatus
 
 
 class CoffeeTransaction(Base):
-    """Moisture-deduction priced commodity. See app/services/pricing.py"""
+    """Direct weight x price pricing model — no moisture deduction."""
     __tablename__ = "coffee_transactions"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     seller_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sellers.id"))
     date: Mapped[date] = mapped_column(Date, default=date.today)
     weight_kg: Mapped[float] = mapped_column(Float, nullable=False)
-    water_percent: Mapped[float] = mapped_column(Float, nullable=False)
-    standard_percent: Mapped[float] = mapped_column(Float, default=7.0)
+    bags: Mapped[int | None] = mapped_column(Integer, nullable=True, default=1)
+    water_percent: Mapped[float | None] = mapped_column(Float, nullable=True, default=0.0)
+    standard_percent: Mapped[float | None] = mapped_column(Float, nullable=True, default=0.0)
     price_per_kg: Mapped[float] = mapped_column(Float, nullable=False)
     net_weight_kg: Mapped[float] = mapped_column(Float, nullable=False)
     total_price: Mapped[float] = mapped_column(Float, nullable=False)

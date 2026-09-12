@@ -69,6 +69,15 @@ export default function TopHeader() {
                   </span>
 
                   {/* Contextual Action Pill Button (Mockup Exact Match) */}
+                  {isManager && (
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent("open-supply-modal"))}
+                      className="inline-block px-2.5 py-0.5 rounded-md bg-[#168821] text-white font-bold text-[11px] hover:bg-[#126e1a] shadow-xs active:scale-95 transition cursor-pointer"
+                    >
+                      SUPPLY
+                    </button>
+                  )}
                   {isManager && location.pathname === "/" && (
                     <Link
                       to="/loan"
@@ -267,23 +276,27 @@ export default function TopHeader() {
 
                 {/* Quick Navigation / Settings in Profile Popover */}
                 <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-1">
-                  <Link
-                    to="/receipts"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-[#168821] transition"
-                  >
-                    <Receipt className="w-4 h-4 text-emerald-700" />
-                    <span>Receipts & Verification</span>
-                  </Link>
+                  {!isSystemAdmin && (
+                    <>
+                      <Link
+                        to="/receipts"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-[#168821] transition"
+                      >
+                        <Receipt className="w-4 h-4 text-emerald-700" />
+                        <span>Receipts & Verification</span>
+                      </Link>
 
-                  <Link
-                    to="/reports"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-[#168821] transition"
-                  >
-                    <FileBarChart className="w-4 h-4 text-emerald-700" />
-                    <span>Reports & Analytics</span>
-                  </Link>
+                      <Link
+                        to="/reports"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-[#168821] transition"
+                      >
+                        <FileBarChart className="w-4 h-4 text-emerald-700" />
+                        <span>Reports & Analytics</span>
+                      </Link>
+                    </>
+                  )}
 
                   <button
                     type="button"
@@ -315,31 +328,45 @@ export default function TopHeader() {
 
       </div>
 
-      {/* Mobile Quick Action Bar: Receipt, Report, and Change Password */}
+      {/* Mobile Quick Action Bar */}
       <div className="md:hidden flex items-center justify-between gap-1.5 px-3 py-1.5 bg-slate-50/95 border-t border-slate-200/70">
-        <Link
-          to="/receipts"
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-bold transition ${
-            location.pathname === "/receipts"
-              ? "bg-[#168821] text-white shadow-xs"
-              : "bg-white text-slate-700 border border-slate-200 hover:bg-emerald-50 hover:text-[#168821]"
-          }`}
-        >
-          <Receipt className="w-3.5 h-3.5 shrink-0" />
-          <span>Receipt</span>
-        </Link>
+        {!isSystemAdmin && (
+          <>
+            <Link
+              to="/receipts"
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-bold transition ${
+                location.pathname === "/receipts"
+                  ? "bg-[#168821] text-white shadow-xs"
+                  : "bg-white text-slate-700 border border-slate-200 hover:bg-emerald-50 hover:text-[#168821]"
+              }`}
+            >
+              <Receipt className="w-3.5 h-3.5 shrink-0" />
+              <span>Receipt</span>
+            </Link>
 
-        <Link
-          to="/reports"
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-bold transition ${
-            location.pathname === "/reports"
-              ? "bg-[#168821] text-white shadow-xs"
-              : "bg-white text-slate-700 border border-slate-200 hover:bg-emerald-50 hover:text-[#168821]"
-          }`}
-        >
-          <FileBarChart className="w-3.5 h-3.5 shrink-0" />
-          <span>Report</span>
-        </Link>
+            <Link
+              to="/reports"
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-bold transition ${
+                location.pathname === "/reports"
+                  ? "bg-[#168821] text-white shadow-xs"
+                  : "bg-white text-slate-700 border border-slate-200 hover:bg-emerald-50 hover:text-[#168821]"
+              }`}
+            >
+              <FileBarChart className="w-3.5 h-3.5 shrink-0" />
+              <span>Report</span>
+            </Link>
+          </>
+        )}
+
+        {isManager && (
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent("open-supply-modal"))}
+            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-bold transition bg-[#168821] text-white hover:bg-[#126e1a] cursor-pointer shadow-xs"
+          >
+            <span>Supply</span>
+          </button>
+        )}
 
         <button
           type="button"

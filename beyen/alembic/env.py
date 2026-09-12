@@ -23,6 +23,11 @@ fileConfig(config.config_file_name)
 db_url = settings.DATABASE_URL
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
+if db_url.startswith("postgresql://") and "+pg8000" not in db_url:
+    try:
+        import psycopg2  # noqa: F401
+    except Exception:
+        db_url = db_url.replace("postgresql://", "postgresql+pg8000://", 1)
 config.set_main_option("sqlalchemy.url", db_url)
 
 target_metadata = Base.metadata

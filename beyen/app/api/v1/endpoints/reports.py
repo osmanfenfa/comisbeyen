@@ -28,24 +28,23 @@ from app.services.report_export import export_to_pdf, export_to_excel
 
 router = APIRouter()
 
-ANY_STAFF = require_role(UserRole.produce_manager, UserRole.system_admin, UserRole.produce_secretary)
-MANAGER_OR_ADMIN = require_role(UserRole.produce_manager, UserRole.system_admin)
+ANY_STAFF = require_role(UserRole.produce_manager, UserRole.produce_secretary)
+MANAGER_ONLY = require_role(UserRole.produce_manager)
 
 
 def _filter_produce(model, db, current, status=None, seller_id=None,
                     date_from=None, date_to=None):
     query = db.query(model)
-    if current["role"] != UserRole.system_admin.value:
-        tenant_produce_id = current.get("produce_id") or current["id"]
-        query = query.filter(model.produce_id == tenant_produce_id)
-        if current["role"] == UserRole.produce_secretary.value:
-            if current.get("station_name"):
-                query = query.filter(
-                    (model.station_name == current["station_name"]) |
-                    (model.created_by == current["id"])
-                )
-            else:
-                query = query.filter(model.created_by == current["id"])
+    tenant_produce_id = current.get("produce_id") or current["id"]
+    query = query.filter(model.produce_id == tenant_produce_id)
+    if current["role"] == UserRole.produce_secretary.value:
+        if current.get("station_name"):
+            query = query.filter(
+                (model.station_name == current["station_name"]) |
+                (model.created_by == current["id"])
+            )
+        else:
+            query = query.filter(model.created_by == current["id"])
     if seller_id:
         query = query.filter(model.seller_id == seller_id)
     if status:
@@ -64,6 +63,7 @@ def _txn_to_dict(txn, commodity: str) -> dict:
         "seller_id": str(txn.seller_id),
         "date": str(txn.date),
         "weight_kg": txn.weight_kg,
+        "bags": getattr(txn, "bags", 1),
         "total_price": txn.total_price,
         "status": txn.status.value,
         "created_by": str(txn.created_by),
@@ -119,9 +119,9 @@ def produce_report_export(
     date_from: date | None = None,
     date_to: date | None = None,
     db: Session = Depends(get_db),
-    current=Depends(MANAGER_OR_ADMIN),
+    current=Depends(MANAGER_ONLY),
 ):
-    """Export produce report as PDF or Excel. Manager/Admin only. (spec section 12)"""
+    """Export produce report as PDF or Excel. Manager only. (spec section 12)"""
     rows = []
     if not commodity or commodity == "cocoa":
         rows += [_txn_to_dict(t, "cocoa") for t in
@@ -161,13 +161,12 @@ def loans_report(
     status: str | None = None,
     seller_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
-    current=Depends(MANAGER_OR_ADMIN),
+    current=Depends(MANAGER_ONLY),
 ):
-    """Loan status report."""
+    """Loan status report for Produce Manager."""
     query = db.query(Loan)
-    if current["role"] != UserRole.system_admin.value:
-        tenant_produce_id = current.get("produce_id") or current["id"]
-        query = query.filter(Loan.produce_id == tenant_produce_id)
+    tenant_produce_id = current.get("produce_id") or current["id"]
+    query = query.filter(Loan.produce_id == tenant_produce_id)
     if seller_id:
         query = query.filter(Loan.seller_id == seller_id)
     if status:
@@ -207,7 +206,7 @@ def seller_statement(
     date_from: date | None = None,
     date_to: date | None = None,
     db: Session = Depends(get_db),
-    current=Depends(MANAGER_OR_ADMIN),
+    current=Depends(MANAGER_ONLY),
 ):
     """Per-seller statement: all produce transactions, all loans, receipts."""
     cocoa = _filter_produce(CocoaTransaction, db, current, seller_id=seller_id,
@@ -219,10 +218,9 @@ def seller_statement(
 
     loan_query = db.query(Loan).filter(Loan.seller_id == seller_id)
     receipt_query = db.query(Receipt).filter(Receipt.seller_id == seller_id)
-    if current["role"] != UserRole.system_admin.value:
-        tenant_produce_id = current.get("produce_id") or current["id"]
-        loan_query = loan_query.filter(Loan.produce_id == tenant_produce_id)
-        receipt_query = receipt_query.filter(Receipt.produce_id == tenant_produce_id)
+    tenant_produce_id = current.get("produce_id") or current["id"]
+    loan_query = loan_query.filter(Loan.produce_id == tenant_produce_id)
+    receipt_query = receipt_query.filter(Receipt.produce_id == tenant_produce_id)
 
     loans = loan_query.all()
     loan_rows = []

@@ -8,13 +8,32 @@ from app.services.pricing import calculate_moisture_deduction_price, calculate_d
 # Pricing unit tests (spec section 8 worked example)
 # ---------------------------------------------------------------------------
 
-def test_cocoa_pricing_example_from_spec():
+def test_cocoa_pricing_proportional_moisture_deduction():
+    # Spec example: weight=40kg, water_percent=13.7%, standard_percent=7%, price_per_kg=40
+    # Excess moisture = 13.7% - 7.0% = 6.7%
+    # Deduction = 40kg * 6.7% = 2.68 kg
+    # Net weight = 40kg - 2.68kg = 37.32 kg
+    # Total price = 37.32 * 40 = 1492.80
     result = calculate_moisture_deduction_price(
         weight_kg=40, water_percent=13.7, standard_percent=7, price_per_kg=40
     )
-    assert result["moisture_deduction"] == 6.7
-    assert result["net_weight_kg"] == 33.3
-    assert result["total_price"] == 1332.0
+    assert result["moisture_deduction"] == 2.68
+    assert result["net_weight_kg"] == 37.32
+    assert result["total_price"] == 1492.80
+
+
+def test_user_20kg_12_percent_moisture_deduction():
+    # User requirement: 20KG and 12%, 12% - 7% = 5%. 20KG - 5% (not 5KG). What remain is multiply by the price.
+    # Excess = 5%
+    # Deduction = 20 * 0.05 = 1.0 kg
+    # Net weight = 20 - 1.0 = 19.0 kg
+    # Total price = 19.0 * 40 = 760.0
+    result = calculate_moisture_deduction_price(
+        weight_kg=20, water_percent=12, standard_percent=7, price_per_kg=40
+    )
+    assert result["moisture_deduction"] == 1.0
+    assert result["net_weight_kg"] == 19.0
+    assert result["total_price"] == 760.0
 
 
 def test_cola_direct_pricing():
@@ -198,8 +217,8 @@ def test_random_seller_purchase_and_detailed_receipt(client):
     assert txn_data["seller_name"] == "Abu Mansaray"
     assert txn_data["seller_contact"] == "+23277998877"
     assert txn_data["is_random_seller"] is True
-    assert txn_data["net_weight_kg"] == 45.5
-    assert txn_data["total_price"] == 1820.0
+    assert txn_data["net_weight_kg"] == 47.75
+    assert txn_data["total_price"] == 1910.0
 
     # Verify seller is in sellers list
     seller_resp = client.get(f"/api/v1/sellers/{seller_id}", headers=headers)
@@ -225,10 +244,10 @@ def test_random_seller_purchase_and_detailed_receipt(client):
     assert receipt["is_random_seller"] is True
     assert receipt["weight_kg"] == 50.0
     assert receipt["water_percent"] == 11.5
-    assert receipt["net_weight_kg"] == 45.5
+    assert receipt["net_weight_kg"] == 47.75
     assert receipt["price_per_kg"] == 40.0
-    assert receipt["gross_amount"] == 1820.0
-    assert receipt["net_amount_paid"] == 1820.0
+    assert receipt["gross_amount"] == 1910.0
+    assert receipt["net_amount_paid"] == 1910.0
     assert receipt["station_name"] is not None
     assert receipt["issued_by_name"] is not None
 

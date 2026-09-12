@@ -11,18 +11,22 @@ def calculate_moisture_deduction_price(
     """
     Used for Cocoa and Coffee.
 
-    moisture_deduction = water_percent - standard_percent
-    net_weight = weight_kg - moisture_deduction
-    total_price = net_weight * price_per_kg
+    Excess moisture percentage above standard baseline is deducted proportionally
+    from the gross weight:
+      excess_percent = max(0.0, water_percent - standard_percent)
+      moisture_deduction_kg = weight_kg * (excess_percent / 100.0)
+      net_weight_kg = weight_kg - moisture_deduction_kg
+      total_price = net_weight_kg * price_per_kg
 
-    Example: weight=40, water_percent=13.7, standard=7, price=40
-             -> deduction=6.7, net_weight=33.3, total_price=1332.0
+    Example: weight=20kg, water_percent=12%, standard=7%, price=40
+             -> excess=5%, deduction=20*0.05=1.0kg, net_weight=19.0kg, total_price=760.0
     """
     if water_percent < 0:
         raise ValueError("Water percentage cannot be negative.")
 
     computed_water_percent = max(water_percent, standard_percent)
-    moisture_deduction = round(computed_water_percent - standard_percent, 2)
+    excess_percent = round(computed_water_percent - standard_percent, 2)
+    moisture_deduction = round(weight_kg * (excess_percent / 100.0), 2)
     net_weight = round(weight_kg - moisture_deduction, 2)
 
     if net_weight <= 0:
@@ -32,6 +36,8 @@ def calculate_moisture_deduction_price(
 
     return {
         "moisture_deduction": moisture_deduction,
+        "moisture_deduction_kg": moisture_deduction,
+        "excess_percent": excess_percent,
         "net_weight_kg": net_weight,
         "total_price": total_price,
     }

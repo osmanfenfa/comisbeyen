@@ -204,7 +204,7 @@ export default function Settings() {
             </div>
 
             <p className="text-xs text-slate-500">
-              National standard moisture allowance for export grade. Deductions are calculated as $(W\% - \text{Standard}\%)$.
+              National standard moisture allowance for export grade. Excess moisture % $(W\% - \text{Standard}\%)$ is deducted proportionally from gross weight, and what remains is multiplied by the price.
             </p>
 
             <div>

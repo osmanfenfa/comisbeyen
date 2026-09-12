@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import client from "../api/client.js";
 import { useAuthStore } from "../store/authStore.js";
 import { useAppStore } from "../store/appStore.js";
-import { calculateMoistureDeductionPrice } from "../utils/pricing.js";
+import { calculateDirectPrice } from "../utils/pricing.js";
 import { queueOfflinePurchase } from "../offline/syncQueue.js";
 import { 
   ShoppingBag, CheckCircle, AlertCircle, Clock, 
@@ -21,7 +21,7 @@ export default function Coffee() {
   const [randomContact, setRandomContact] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [weightKg, setWeightKg] = useState("");
-  const [waterPercent, setWaterPercent] = useState("");
+  const [bags, setBags] = useState("1");
   const [pricePerKg, setPricePerKg] = useState("");
 
   const [sellerBalance, setSellerBalance] = useState(null);
@@ -37,8 +37,6 @@ export default function Coffee() {
   const [rejectReason, setRejectReason] = useState("");
   const [receiptModalData, setReceiptModalData] = useState(null);
   const [loanDeductionInput, setLoanDeductionInput] = useState(0);
-
-  const standardPercent = prices?.standard_moisture_percent || 7.0;
 
   useEffect(() => {
     fetchSellers();
@@ -83,11 +81,10 @@ export default function Coffee() {
 
   // Live calculation
   const weight = parseFloat(weightKg) || 0;
-  const water = parseFloat(waterPercent) || 0;
   const price = parseFloat(pricePerKg) || 0;
 
-  const calculation = (weight > 0 && water >= 0 && price > 0)
-    ? calculateMoistureDeductionPrice(weight, water, standardPercent, price)
+  const calculation = (weight > 0 && price > 0)
+    ? calculateDirectPrice(weight, price)
     : null;
 
   // Submit Purchase
@@ -120,21 +117,13 @@ export default function Coffee() {
       }
     }
 
-    if (water < 0) {
-      setFormMessage({
-        type: "error",
-        text: "Water percentage cannot be negative.",
-      });
-      return;
-    }
-
     const payload = {
       seller_id: sellerMode === "registered" ? sellerId : null,
       random_seller_name: sellerMode === "random" ? randomName.trim() : null,
       random_seller_contact: sellerMode === "random" ? randomContact.trim() : null,
       date,
       weight_kg: weight,
-      water_percent: water,
+      bags: parseInt(bags, 10) || 1,
       price_per_kg: price,
     };
 
@@ -161,7 +150,7 @@ export default function Coffee() {
       }
       // Reset
       setWeightKg("");
-      setWaterPercent("");
+      setBags("1");
       if (sellerMode === "random") {
         setRandomName("");
         setRandomContact("");
@@ -223,7 +212,7 @@ export default function Coffee() {
           <h1 className="text-xl font-bold text-slate-900">Coffee Purchasing</h1>
         </div>
         <p className="text-xs text-slate-500 mt-0.5">
-          Moisture-deduction pricing · Standard allowance: {standardPercent}%
+          Flat weight pricing · Direct calculation without moisture deduction
         </p>
       </div>
 
@@ -351,7 +340,7 @@ export default function Coffee() {
           </div>
         )}
 
-        {/* Date & Weight */}
+        {/* Date & Bags */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Date</label>
@@ -365,6 +354,22 @@ export default function Coffee() {
           </div>
 
           <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Number of Bags</label>
+            <input
+              type="number"
+              min="1"
+              required
+              placeholder="e.g. 1"
+              value={bags}
+              onChange={(e) => setBags(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-700 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Scale Weight & Price/kg (No Water % for Coffee) */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Scale Weight (kg)</label>
             <input
               type="number"
@@ -373,25 +378,6 @@ export default function Coffee() {
               placeholder="e.g. 40.0"
               value={weightKg}
               onChange={(e) => setWeightKg(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-700 focus:outline-none"
-            />
-          </div>
-        </div>
-
-        {/* Water % & Price/kg */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Water % (std {standardPercent}%)
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              required
-              placeholder="e.g. 5.5 or 13.7"
-              value={waterPercent}
-              onChange={(e) => setWaterPercent(e.target.value)}
               className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-700 focus:outline-none"
             />
           </div>
@@ -410,21 +396,19 @@ export default function Coffee() {
         </div>
 
         {/* Live Calculation Preview Card */}
-        {calculation && (
+        {calculation !== null && (
           <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 space-y-2 text-xs">
             <div className="flex justify-between text-slate-600">
-              <span>Moisture Deduction:</span>
-              <span className={calculation.moistureDeduction > 0 ? "font-semibold text-red-600" : "font-semibold text-slate-700"}>
-                {calculation.moistureDeduction > 0 ? `-${calculation.moistureDeduction} kg` : "0 kg"}
-              </span>
+              <span>Payable Weight:</span>
+              <span className="font-semibold text-slate-900">{weight} kg</span>
             </div>
             <div className="flex justify-between text-slate-600">
-              <span>Net Payable Weight:</span>
-              <span className="font-semibold text-slate-900">{calculation.netWeight} kg</span>
+              <span>Price per kg:</span>
+              <span className="font-semibold text-slate-900">Nle {price}</span>
             </div>
             <div className="flex justify-between text-sm font-black text-emerald-950 pt-2 border-t border-emerald-200">
               <span>Total Payable Amount:</span>
-              <span className="text-base text-emerald-800">Nle {calculation.totalPrice.toLocaleString()}</span>
+              <span className="text-base text-emerald-800">Nle {calculation.toLocaleString()}</span>
             </div>
           </div>
         )}
@@ -503,16 +487,16 @@ export default function Coffee() {
 
                     <div className="bg-slate-50 p-2.5 rounded-xl grid grid-cols-3 gap-2 text-center text-xs">
                       <div>
-                        <p className="text-[10px] text-slate-400">Gross Wt</p>
+                        <p className="text-[10px] text-slate-400">Bags</p>
+                        <p className="font-bold text-slate-700">{txn.bags ?? 1}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-400">Weight</p>
                         <p className="font-bold text-slate-700">{txn.weight_kg} kg</p>
                       </div>
                       <div>
-                        <p className="text-[10px] text-slate-400">Water %</p>
-                        <p className="font-bold text-slate-700">{txn.water_percent}%</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-400">Net Wt</p>
-                        <p className="font-bold text-emerald-700">{txn.net_weight_kg} kg</p>
+                        <p className="text-[10px] text-slate-400">Price/kg</p>
+                        <p className="font-bold text-emerald-700">Nle {txn.price_per_kg}</p>
                       </div>
                     </div>
 

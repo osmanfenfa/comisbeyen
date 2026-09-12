@@ -52,13 +52,14 @@ def format_receipt_out(receipt: Receipt, db: Session) -> ReceiptOut:
 
     # Item Details
     weight_kg = receipt.weight_kg
+    bags = getattr(receipt, "bags", None)
     water_percent = receipt.water_percent
     standard_percent = receipt.standard_percent
     net_weight_kg = receipt.net_weight_kg
     price_per_kg = receipt.price_per_kg
 
     # Fallback to transaction if snapshot fields weren't populated
-    if weight_kg is None or net_weight_kg is None:
+    if weight_kg is None or net_weight_kg is None or bags is None:
         ttype = receipt.transaction_type.lower()
         txn = None
         if ttype == "cocoa":
@@ -70,6 +71,7 @@ def format_receipt_out(receipt: Receipt, db: Session) -> ReceiptOut:
 
         if txn:
             weight_kg = weight_kg or txn.weight_kg
+            bags = bags or getattr(txn, "bags", 1)
             water_percent = water_percent or getattr(txn, "water_percent", None)
             standard_percent = standard_percent or getattr(txn, "standard_percent", None)
             net_weight_kg = net_weight_kg or getattr(txn, "net_weight_kg", txn.weight_kg)
@@ -103,6 +105,7 @@ def format_receipt_out(receipt: Receipt, db: Session) -> ReceiptOut:
         seller_code=seller_code,
         is_random_seller=is_random,
         weight_kg=weight_kg,
+        bags=bags,
         water_percent=water_percent,
         standard_percent=standard_percent,
         moisture_deduction_kg=moisture_ded,
@@ -158,6 +161,7 @@ def issue_and_create_receipt(
         business_address=biz_addr,
         business_phone=biz_phone,
         weight_kg=txn.weight_kg,
+        bags=getattr(txn, "bags", 1),
         water_percent=getattr(txn, "water_percent", None),
         standard_percent=getattr(txn, "standard_percent", None),
         net_weight_kg=getattr(txn, "net_weight_kg", txn.weight_kg),

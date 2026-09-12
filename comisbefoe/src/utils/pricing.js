@@ -5,10 +5,17 @@
  */
 export function calculateMoistureDeductionPrice(weightKg, waterPercent, standardPercent, pricePerKg) {
   const computedWater = Math.max(waterPercent, standardPercent);
-  const moistureDeduction = +(computedWater - standardPercent).toFixed(2);
+  const excessPercent = +(computedWater - standardPercent).toFixed(2);
+  const moistureDeduction = +((weightKg * excessPercent) / 100).toFixed(2);
   const netWeight = +(weightKg - moistureDeduction).toFixed(2);
   const totalPrice = +(netWeight * pricePerKg).toFixed(2);
-  return { moistureDeduction, netWeight, totalPrice };
+  return {
+    moistureDeduction,
+    moistureDeductionKg: moistureDeduction,
+    excessPercent,
+    netWeight,
+    totalPrice,
+  };
 }
 
 export function calculateDirectPrice(weightKg, pricePerKg) {

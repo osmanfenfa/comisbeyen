@@ -36,8 +36,9 @@ class ReceiptOut(BaseModel):
     seller_code: str | None = None
     is_random_seller: bool = False
 
-    # Detail of Item (Produce scale weight, moisture %, deductions, price)
+    # Detail of Item (Produce scale weight, moisture %, deductions, price, bags)
     weight_kg: float | None = None
+    bags: int | None = None
     water_percent: float | None = None
     standard_percent: float | None = None
     moisture_deduction_kg: float | None = None

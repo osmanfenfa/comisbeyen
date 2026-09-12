@@ -169,6 +169,8 @@ def edit_purchase(
         standard_percent = _get_standard_percent(db)
         result = _compute(payload, standard_percent)
         txn.weight_kg = payload.weight_kg
+        if payload.bags is not None:
+            txn.bags = payload.bags
         txn.water_percent = payload.water_percent
         txn.price_per_kg = payload.price_per_kg
         txn.net_weight_kg = result["net_weight_kg"]
@@ -184,12 +186,14 @@ def edit_purchase(
         raise HTTPException(status_code=400, detail="Only PENDING or REJECTED transactions can be edited.")
 
     old_snap = {
-        "weight_kg": txn.weight_kg, "water_percent": txn.water_percent,
+        "weight_kg": txn.weight_kg, "bags": txn.bags, "water_percent": txn.water_percent,
         "price_per_kg": txn.price_per_kg,
     }
     standard_percent = _get_standard_percent(db)
     result = _compute(payload, standard_percent)
     txn.weight_kg = payload.weight_kg
+    if payload.bags is not None:
+        txn.bags = payload.bags
     txn.water_percent = payload.water_percent
     txn.price_per_kg = payload.price_per_kg
     txn.net_weight_kg = result["net_weight_kg"]

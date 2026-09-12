@@ -15,7 +15,7 @@ from app.schemas.receipt import ReceiptOut
 
 router = APIRouter()
 
-STAFF_ROLES = require_role(UserRole.produce_manager, UserRole.produce_secretary, UserRole.system_admin)
+STAFF_ROLES = require_role(UserRole.produce_manager, UserRole.produce_secretary)
 
 
 @router.get("/", response_model=list[ReceiptOut])
@@ -28,14 +28,14 @@ def list_receipts(
     current=Depends(STAFF_ROLES),
 ):
     """
-    Manager/Admin — list issued receipts.
+    Produce Store Staff (Manager/Secretary) — list issued receipts.
+    System Admin is not permitted to see receipts of any produce store.
     Filterable by seller, type (cocoa|coffee|cola), date range.
     """
     from datetime import datetime
     query = db.query(Receipt)
-    if current["role"] != UserRole.system_admin.value:
-        tenant_produce_id = current.get("produce_id") or current["id"]
-        query = query.filter(Receipt.produce_id == tenant_produce_id)
+    tenant_produce_id = current.get("produce_id") or current["id"]
+    query = query.filter(Receipt.produce_id == tenant_produce_id)
 
     if seller_id:
         query = query.filter(Receipt.seller_id == seller_id)
@@ -68,9 +68,8 @@ def get_receipt(
     receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
     if not receipt:
         raise HTTPException(status_code=404, detail="Receipt not found")
-    if current["role"] != UserRole.system_admin.value:
-        tenant_produce_id = current.get("produce_id") or current["id"]
-        if receipt.produce_id and receipt.produce_id != tenant_produce_id:
-            raise HTTPException(status_code=403, detail="Access denied")
+    tenant_produce_id = current.get("produce_id") or current["id"]
+    if receipt.produce_id and receipt.produce_id != tenant_produce_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     from app.services.receipt_helper import format_receipt_out
     return format_receipt_out(receipt, db)

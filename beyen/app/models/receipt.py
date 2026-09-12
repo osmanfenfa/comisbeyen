@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Float, DateTime, ForeignKey, Boolean
+from sqlalchemy import String, Float, Integer, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 
@@ -33,6 +33,7 @@ class Receipt(Base):
 
     # Item Details Snapshot
     weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    bags: Mapped[int | None] = mapped_column(Integer, nullable=True, default=1)
     water_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
     standard_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
     net_weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)

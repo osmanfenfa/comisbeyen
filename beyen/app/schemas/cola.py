@@ -5,12 +5,12 @@ from app.models.transaction_status import TransactionStatus
 
 
 class ColaTransactionCreate(BaseModel):
-    seller_id: uuid.UUID
     seller_id: uuid.UUID | None = None
     random_seller_name: str | None = None
     random_seller_contact: str | None = None
     date: date
     weight_kg: float
+    bags: int | None = 1
     price_per_kg: float
     manual_total_override: float | None = None  # if set, overrides calculated total
 
@@ -18,6 +18,7 @@ class ColaTransactionCreate(BaseModel):
 class ColaTransactionEdit(BaseModel):
     """Used to correct a REJECTED or PENDING transaction before (re)submitting."""
     weight_kg: float
+    bags: int | None = 1
     price_per_kg: float
     manual_total_override: float | None = None
 
@@ -31,6 +32,7 @@ class ColaTransactionOut(BaseModel):
     seller_id: uuid.UUID
     date: date
     weight_kg: float
+    bags: int | None = 1
     price_per_kg: float
     total_price: float
     status: TransactionStatus

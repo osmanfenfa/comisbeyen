@@ -55,6 +55,19 @@ async def lifespan(app: FastAPI):
                     conn.execute(text("ALTER TABLE loans ADD COLUMN IF NOT EXISTS produce_id UUID"))
                     conn.execute(text("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS produce_id UUID"))
 
+                    # Bags tracking columns
+                    conn.execute(text("ALTER TABLE cocoa_transactions ADD COLUMN IF NOT EXISTS bags INTEGER DEFAULT 1"))
+                    conn.execute(text("ALTER TABLE coffee_transactions ADD COLUMN IF NOT EXISTS bags INTEGER DEFAULT 1"))
+                    conn.execute(text("ALTER TABLE cola_transactions ADD COLUMN IF NOT EXISTS bags INTEGER DEFAULT 1"))
+                    conn.execute(text("ALTER TABLE receipts ADD COLUMN IF NOT EXISTS bags INTEGER DEFAULT 1"))
+
+                    # Allow nullable water_percent and standard_percent for coffee
+                    try:
+                        conn.execute(text("ALTER TABLE coffee_transactions ALTER COLUMN water_percent DROP NOT NULL"))
+                        conn.execute(text("ALTER TABLE coffee_transactions ALTER COLUMN standard_percent DROP NOT NULL"))
+                    except Exception:
+                        pass
+
                     # Safe backfill of produce_id for existing records
                     conn.execute(text("UPDATE users SET produce_id = id WHERE role = 'produce_manager' AND produce_id IS NULL"))
                     conn.execute(text("UPDATE users SET produce_id = created_by WHERE role = 'produce_secretary' AND produce_id IS NULL AND created_by IS NOT NULL"))

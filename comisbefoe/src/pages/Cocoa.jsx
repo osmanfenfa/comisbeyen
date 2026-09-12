@@ -21,6 +21,7 @@ export default function Cocoa() {
   const [randomContact, setRandomContact] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [weightKg, setWeightKg] = useState("");
+  const [bags, setBags] = useState("1");
   const [waterPercent, setWaterPercent] = useState("");
   const [pricePerKg, setPricePerKg] = useState("");
 
@@ -134,6 +135,7 @@ export default function Cocoa() {
       random_seller_contact: sellerMode === "random" ? randomContact.trim() : null,
       date,
       weight_kg: weight,
+      bags: parseInt(bags, 10) || 1,
       water_percent: water,
       price_per_kg: price,
     };
@@ -161,6 +163,7 @@ export default function Cocoa() {
       }
       // Reset
       setWeightKg("");
+      setBags("1");
       setWaterPercent("");
       if (sellerMode === "random") {
         setRandomName("");
@@ -351,7 +354,7 @@ export default function Cocoa() {
           </div>
         )}
 
-        {/* Date & Weight */}
+        {/* Date & Bags */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Date</label>
@@ -365,6 +368,22 @@ export default function Cocoa() {
           </div>
 
           <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Number of Bags</label>
+            <input
+              type="number"
+              min="1"
+              required
+              placeholder="e.g. 1"
+              value={bags}
+              onChange={(e) => setBags(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-700 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Scale Weight & Water % */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Scale Weight (kg)</label>
             <input
               type="number"
@@ -376,10 +395,7 @@ export default function Cocoa() {
               className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-700 focus:outline-none"
             />
           </div>
-        </div>
 
-        {/* Water % & Price/kg */}
-        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
               Water % (std {standardPercent}%)
@@ -395,25 +411,26 @@ export default function Cocoa() {
               className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-700 focus:outline-none"
             />
           </div>
+        </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Price per kg (Nle)</label>
-            <input
-              type="number"
-              step="0.5"
-              required
-              value={pricePerKg}
-              onChange={(e) => setPricePerKg(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-700 focus:outline-none"
-            />
-          </div>
+        {/* Price/kg */}
+        <div>
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Price per kg (Nle)</label>
+          <input
+            type="number"
+            step="0.5"
+            required
+            value={pricePerKg}
+            onChange={(e) => setPricePerKg(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-emerald-700 focus:outline-none"
+          />
         </div>
 
         {/* Live Calculation Preview Card */}
         {calculation && (
           <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 space-y-2 text-xs">
             <div className="flex justify-between text-slate-600">
-              <span>Moisture Deduction:</span>
+              <span>Moisture Deduction{calculation.excessPercent > 0 ? ` (${calculation.excessPercent}%)` : ""}:</span>
               <span className={calculation.moistureDeduction > 0 ? "font-semibold text-red-600" : "font-semibold text-slate-700"}>
                 {calculation.moistureDeduction > 0 ? `-${calculation.moistureDeduction} kg` : "0 kg"}
               </span>
@@ -501,7 +518,11 @@ export default function Cocoa() {
                       <span className="text-base font-black text-emerald-800">Nle {txn.total_price}</span>
                     </div>
 
-                    <div className="bg-slate-50 p-2.5 rounded-xl grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="bg-slate-50 p-2.5 rounded-xl grid grid-cols-4 gap-2 text-center text-xs">
+                      <div>
+                        <p className="text-[10px] text-slate-400">Bags</p>
+                        <p className="font-bold text-slate-700">{txn.bags ?? 1}</p>
+                      </div>
                       <div>
                         <p className="text-[10px] text-slate-400">Gross Wt</p>
                         <p className="font-bold text-slate-700">{txn.weight_kg} kg</p>
