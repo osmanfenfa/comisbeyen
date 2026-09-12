@@ -16,3 +16,5 @@ dist/
 *.log
 *.db
 .pytest_cache/
+COMIS-*.md
+

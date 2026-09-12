@@ -22,6 +22,10 @@ import Users from "./pages/Users.jsx";
 import Settings from "./pages/Settings.jsx";
 import AuditLogs from "./pages/AuditLogs.jsx";
 import EditProfile from "./pages/EditProfile.jsx";
+import TermsOfService from "./pages/TermsOfService.jsx";
+import UserAgreement from "./pages/UserAgreement.jsx";
+import PrivacyPolicy from "./pages/PrivacyPolicy.jsx";
+import About from "./pages/About.jsx";
 
 function AppLayout({ children }) {
   const { role } = useAuthStore();
@@ -60,6 +64,14 @@ export default function App() {
           <Route path="/login" element={<Login initialMode="signin" />} />
           <Route path="/signup" element={<Login initialMode="signup" />} />
           <Route path="/register" element={<Login initialMode="signup" />} />
+
+          {/* Public Legal & Informational Pages */}
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/user-agreement" element={<UserAgreement />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/about" element={<About />} />
 
           {/* Core Dashboard / Home */}
           <Route
