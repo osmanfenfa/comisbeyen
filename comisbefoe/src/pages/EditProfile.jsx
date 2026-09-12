@@ -149,13 +149,14 @@ export default function EditProfile() {
             ========================================================================= */}
         <div className="bg-[#d4a000] p-4 sm:p-5 relative text-white">
           <div className="flex items-center justify-between">
-            {/* Left: Leaf Logo in Circular Badge */}
-            <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center p-2 shadow-xs">
-              <img
-                src="/comis-logo.png"
-                alt="COMIS Logo"
-                className="h-8 w-auto object-contain"
-              />
+            {/* Left: Title */}
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+                Edit Profile
+              </h2>
+              <p className="text-xs text-amber-100 font-medium mt-0.5">
+                Manage your produce buying business & personal details
+              </p>
             </div>
 
             {/* Right: Exit / Return Button (Logout icon matching mockup) */}

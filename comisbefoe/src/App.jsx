@@ -42,11 +42,11 @@ function AppLayout({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/80 flex flex-col font-sans selection:bg-emerald-100 selection:text-emerald-900">
+    <div className="h-[100dvh] max-h-[100dvh] bg-slate-50/80 flex flex-col font-sans selection:bg-emerald-100 selection:text-emerald-900 overflow-hidden">
       <OfflineBanner />
       <TopHeader />
 
-      <main className="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-6">
+      <main className="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-6 overflow-y-auto overscroll-contain">
         {children}
       </main>
 

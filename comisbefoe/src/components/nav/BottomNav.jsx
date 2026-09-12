@@ -74,8 +74,8 @@ export default function BottomNav() {
   // =========================================================================
   if (role === "system_admin") {
     return (
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40">
-        <div className="w-full max-w-lg mx-auto bg-[#168821] text-white flex items-center justify-around py-2 px-4 shadow-xl border-t border-emerald-700">
+      <nav className="md:hidden shrink-0 w-full z-40 bg-[#168821] shadow-xl border-t border-emerald-700 select-none pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+        <div className="w-full max-w-lg mx-auto text-white flex items-center justify-around py-2 px-4">
           {/* Home */}
           <NavLink
             to="/"
@@ -142,8 +142,8 @@ export default function BottomNav() {
   // PRODUCE MANAGER & SECRETARY BOTTOM NAV: 5 Circular Commodity Buttons
   // =========================================================================
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40">
-      <div className="w-full max-w-lg mx-auto bg-[#168821] py-2.5 px-3 flex items-center justify-around shadow-2xl border-t border-emerald-700">
+    <nav className="md:hidden shrink-0 w-full z-40 bg-[#168821] shadow-2xl border-t border-emerald-700 select-none pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <div className="w-full max-w-lg mx-auto py-2 px-3 flex items-center justify-around">
         
         {/* 1. Home button */}
         <NavLink

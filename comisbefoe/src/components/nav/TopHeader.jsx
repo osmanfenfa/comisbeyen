@@ -40,14 +40,6 @@ export default function TopHeader() {
         
         {/* Left branding & identity */}
         <div className="flex items-center gap-2.5 min-w-0">
-          <Link to="/" className="shrink-0">
-            <img
-              src="/comis-logo.png"
-              alt="COMIS Logo"
-              className="h-9 w-auto object-contain"
-            />
-          </Link>
-
           <div className="min-w-0">
             {isSystemAdmin ? (
               <>
